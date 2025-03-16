@@ -1,0 +1,25 @@
+name: atomic_flutter
+description: A lightweight, reactive state management solution for Flutter applications with domain-specific atoms.
+version: 0.1.0
+homepage: https://github.com/arkarmintun1/atomic_flutter
+
+environment:
+  sdk: ^3.6.2
+  flutter: '>=1.17.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  meta: ^1.9.1
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^2.0.2
+
+# flutter:
+
+# Additional package metadata
+repository: https://github.com/arkarmintun1/atomic_flutter
+issue_tracker: https://github.com/arkarmintun1/atomic_flutter/issues
+documentation: https://github.com/arkarmintun1/atomic_flutter#readme
