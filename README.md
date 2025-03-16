@@ -1,10 +1,17 @@
-# AtomicFlutter Documentation
+# atomic_flutter
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/arkarmintun1/atomic_flutter/main/assets/atomic_flutter_logo.svg" width="150" alt="AtomicFlutter Logo">
+</p>
+
+[![pub package](https://img.shields.io/pub/v/atomic_flutter.svg)](https://pub.dev/packages/atomic_flutter)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 AtomicFlutter is a lightweight, reactive state management solution for Flutter applications. It provides a simple way to create, manage, and react to state changes with minimal boilerplate and maximum type safety.
 
 ## Table of Contents
 
-- [AtomicFlutter Documentation](#atomicflutter-documentation)
+- [atomic_flutter](#atomic_flutter)
   - [Table of Contents](#table-of-contents)
   - [Installation](#installation)
   - [Core Concepts](#core-concepts)

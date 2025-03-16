@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="40" fill="#1A1A2E" />
+  
+  <!-- Minimalist atom symbol with Flutter colors -->
+  <g transform="translate(256, 256)">
+    <!-- Three quarter circles forming a stylized atomic symbol -->
+    <path d="M 0,-130 A 130,130 0 0,1 112.6,65 L 0,0 Z" fill="#54C5F8" />
+    <path d="M 0,-130 A 130,130 0 0,0 -112.6,65 L 0,0 Z" fill="#29B6F6" />
+    <path d="M -112.6,65 A 130,130 0 0,0 112.6,65 L 0,0 Z" fill="#01579B" />
+    
+    <!-- Center dot -->
+    <circle cx="0" cy="0" r="30" fill="white" />
+  </g>
+</svg>
