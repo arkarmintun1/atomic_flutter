@@ -23,3 +23,12 @@ dev_dependencies:
 repository: https://github.com/arkarmintun1/atomic_flutter
 issue_tracker: https://github.com/arkarmintun1/atomic_flutter/issues
 documentation: https://github.com/arkarmintun1/atomic_flutter#readme
+
+funding:
+  - https://github.com/sponsors/arkarmintun1
+
+topics:
+  - state-management
+  - reactive
+  - flutter
+  - atoms
