@@ -94,7 +94,7 @@ class Atom<T> {
 
     // Notify active dependents
     for (final dependent in activeDependents) {
-      (dependent as dynamic)._computeValue();
+      (dependent as _ComputedAtom)._computeValue();
     }
 
     // Then notify UI listeners
@@ -236,6 +236,27 @@ class Atom<T> {
   String toString() => 'Atom<$T>($_id, $_value, refs: $_refCount)';
 }
 
+class _ComputedAtom<T> extends Atom<T> {
+  final Function() _computeFunction;
+
+  _ComputedAtom(
+    T initialValue,
+    this._computeFunction, {
+    String? id,
+    bool autoDispose = true,
+    Duration? disposeTimeout,
+  }) : super(
+          initialValue,
+          id: id,
+          autoDispose: autoDispose,
+          disposeTimeout: disposeTimeout,
+        );
+
+  void _computeValue() {
+    set(_computeFunction());
+  }
+}
+
 /// Create a derived atom that depends on others
 ///
 /// [compute]: A function that computes the derived value
@@ -250,8 +271,9 @@ Atom<R> computed<R>(
   bool autoDispose = true,
   Duration? disposeTimeout,
 }) {
-  final derivedAtom = Atom<R>(
+  final derivedAtom = _ComputedAtom<R>(
     compute(),
+    compute,
     id: id,
     autoDispose: autoDispose,
     disposeTimeout: disposeTimeout,
@@ -264,11 +286,6 @@ Atom<R> computed<R>(
     // Add this atom as a dependent of its dependencies
     atom._dependents.add(WeakReference(derivedAtom));
   }
-
-  // Add the compute method
-  (derivedAtom as dynamic)._computeValue = () {
-    derivedAtom.set(compute());
-  };
 
   return derivedAtom;
 }
