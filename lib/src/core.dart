@@ -293,16 +293,17 @@ Atom<R> computed<R>(
 /// Internal listener class to manage subscriptions
 class _AtomListener<T> {
   final void Function(T value) callback;
+  final int _callbackIdentity;
 
-  _AtomListener(this.callback);
+  _AtomListener(this.callback) : _callbackIdentity = callback.hashCode;
 
   void _notify(T value) => callback(value);
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is _AtomListener && other.callback == callback;
+      other is _AtomListener && _callbackIdentity == other._callbackIdentity;
 
   @override
-  int get hashCode => callback.hashCode;
+  int get hashCode => _callbackIdentity;
 }
