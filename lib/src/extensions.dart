@@ -1,7 +1,7 @@
 import 'dart:async';
+import 'package:atomic_flutter/src/core.dart';
+import 'package:atomic_flutter/src/widgets.dart';
 import 'package:flutter/widgets.dart';
-import 'core.dart';
-import 'widgets.dart';
 
 /// Extension methods for Atom class
 extension AtomExtensions<T> on Atom<T> {
@@ -109,4 +109,80 @@ extension AtomExtensions<T> on Atom<T> {
 
     return throttledAtom;
   }
+
+  /// Map the atom's value to another type
+  ///
+  /// Returns a new atom that contains the mapped value and updates
+  /// whenever this atom changes.
+  Atom<R> map<R>(R Function(T value) mapper) {
+    final mappedAtom = Atom<R>(mapper(value), autoDispose: true);
+
+    addListener((newValue) {
+      try {
+        mappedAtom.set(mapper(newValue));
+      } catch (e) {
+        // Handle mapping errors gracefully
+        if (Atom.debugMode) {
+          print('AtomicFlutter: Mapping error in atom ${id}: $e');
+        }
+      }
+    });
+
+    return mappedAtom;
+  }
+
+  /// Filter atom updates based on a predicate
+  ///
+  /// Returns a new atom that only updates when the predicate returns true.
+  Atom<T> where(bool Function(T value) predicate) {
+    final filteredAtom = Atom<T>(value, autoDispose: true);
+
+    addListener((newValue) {
+      if (predicate(newValue)) {
+        filteredAtom.set(newValue);
+      }
+    });
+
+    return filteredAtom;
+  }
+
+  /// Combine this atom with another atom
+  ///
+  /// Returns a new atom containing a tuple of both values.
+  Atom<(T, R)> combine<R>(Atom<R> other) {
+    final combinedAtom = Atom<(T, R)>((value, other.value), autoDispose: true);
+
+    void updateCombined() {
+      combinedAtom.set((value, other.value));
+    }
+
+    addListener((_) => updateCombined());
+    other.addListener((_) => updateCombined());
+
+    return combinedAtom;
+  }
+
+  /// Create a computed atom that depends on this atom
+  ///
+  /// This is a convenience method for creating computed atoms.
+  Atom<R> compute<R>(R Function(T value) computation) {
+    return computed<R>(
+      () => computation(value),
+      tracked: [this],
+      autoDispose: true,
+    );
+  }
+}
+
+/// Batch multiple atom updates together
+void batchAtomUpdates(void Function() updates) {
+  // Simple implementation - could be enhanced with global batching
+  updates();
+}
+
+/// Create multiple atoms at once
+Map<String, Atom<T>> createAtoms<T>(Map<String, T> initialValues) {
+  return initialValues.map(
+    (key, value) => MapEntry(key, Atom<T>(value, id: key)),
+  );
 }
