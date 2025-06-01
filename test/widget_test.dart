@@ -5,7 +5,10 @@ import 'package:atomic_flutter/atomic_flutter.dart';
 void main() {
   group('AtomBuilder Tests', () {
     testWidgets('should build with initial value', (tester) async {
-      final atom = Atom<int>(42);
+      final atom = Atom<int>(
+        42,
+        autoDispose: false, // Disable auto-dispose for tests
+      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -17,10 +20,15 @@ void main() {
       );
 
       expect(find.text('Value: 42'), findsOneWidget);
+
+      // Clean up
+      atom.dispose();
     });
 
     testWidgets('should rebuild when atom changes', (tester) async {
-      final atom = Atom<int>(0);
+      final atom = Atom<int>(
+        0, autoDispose: false, // Disable auto-dispose for tests
+      );
 
       await tester.pumpWidget(
         MaterialApp(
@@ -48,11 +56,14 @@ void main() {
 
       expect(find.text('Count: 1'), findsOneWidget);
       expect(find.text('Count: 0'), findsNothing);
+
+      // Clean up
+      atom.dispose();
     });
 
     testWidgets('should not rebuild when atom value is the same',
         (tester) async {
-      final atom = Atom<int>(5);
+      final atom = Atom<int>(5, autoDispose: false);
       int buildCount = 0;
 
       await tester.pumpWidget(
@@ -74,10 +85,13 @@ void main() {
       await tester.pump();
 
       expect(buildCount, 1); // Should not rebuild
+
+      // Clean up
+      atom.dispose();
     });
 
     testWidgets('should handle multiple AtomBuilders', (tester) async {
-      final atom = Atom<int>(10);
+      final atom = Atom<int>(10, autoDispose: false);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -104,11 +118,14 @@ void main() {
 
       expect(find.text('First: 5'), findsOneWidget);
       expect(find.text('Second: 10'), findsOneWidget);
+
+      // Clean up
+      atom.dispose();
     });
 
     testWidgets('should dispose listener when widget is disposed',
         (tester) async {
-      final atom = Atom<int>(0);
+      final atom = Atom<int>(0, autoDispose: false);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -127,12 +144,15 @@ void main() {
 
       // Should no longer be listening
       expect(atom.hasListeners, false);
+
+      // Clean up
+      atom.dispose();
     });
   });
 
   group('AtomConsumer Tests', () {
     testWidgets('should provide atom value to builder', (tester) async {
-      final atom = Atom<String>('test');
+      final atom = Atom<String>('test', autoDispose: false);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -153,10 +173,13 @@ void main() {
 
       expect(find.text('Value: test'), findsOneWidget);
       expect(find.text('Static child'), findsOneWidget);
+
+      // Clean up
+      atom.dispose();
     });
 
     testWidgets('should not rebuild child when atom changes', (tester) async {
-      final atom = Atom<int>(1);
+      final atom = Atom<int>(1, autoDispose: false);
       int childBuildCount = 0;
 
       Widget buildChild() {
@@ -188,12 +211,16 @@ void main() {
 
       expect(find.text('Value: 2'), findsOneWidget);
       expect(childBuildCount, 1); // Child should not rebuild
+
+      // Clean up
+      atom.dispose();
     });
   });
 
   group('AtomSelector Tests', () {
     testWidgets('should select and build with selected value', (tester) async {
-      final atom = Atom<Map<String, int>>({'count': 5, 'other': 10});
+      final atom =
+          Atom<Map<String, int>>({'count': 5, 'other': 10}, autoDispose: false);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -206,11 +233,15 @@ void main() {
       );
 
       expect(find.text('Count: 5'), findsOneWidget);
+
+      // Clean up
+      atom.dispose();
     });
 
     testWidgets('should only rebuild when selected value changes',
         (tester) async {
-      final atom = Atom<Map<String, int>>({'count': 5, 'other': 10});
+      final atom =
+          Atom<Map<String, int>>({'count': 5, 'other': 10}, autoDispose: false);
       int buildCount = 0;
 
       await tester.pumpWidget(
@@ -240,13 +271,16 @@ void main() {
 
       expect(buildCount, 2); // Should rebuild
       expect(find.text('Count: 7'), findsOneWidget);
+
+      // Clean up
+      atom.dispose();
     });
   });
 
   group('MultiAtomBuilder Tests', () {
     testWidgets('should rebuild when any atom changes', (tester) async {
-      final atom1 = Atom<int>(1);
-      final atom2 = Atom<String>('test');
+      final atom1 = Atom<int>(1, autoDispose: false);
+      final atom2 = Atom<String>('test', autoDispose: false);
       int buildCount = 0;
 
       await tester.pumpWidget(
@@ -275,12 +309,16 @@ void main() {
 
       expect(buildCount, 3);
       expect(find.text('2 - updated'), findsOneWidget);
+
+      // Clean up
+      atom1.dispose();
+      atom2.dispose();
     });
 
     testWidgets('should handle atom list changes', (tester) async {
-      final atom1 = Atom<int>(1);
-      final atom2 = Atom<int>(2);
-      final atom3 = Atom<int>(3);
+      final atom1 = Atom<int>(1, autoDispose: false);
+      final atom2 = Atom<int>(2, autoDispose: false);
+      final atom3 = Atom<int>(3, autoDispose: false);
 
       await tester.pumpWidget(
         MaterialApp(
@@ -316,6 +354,11 @@ void main() {
       await tester.pump();
 
       expect(find.text('1 - 30'), findsOneWidget);
+
+      // Clean up
+      atom1.dispose();
+      atom2.dispose();
+      atom3.dispose();
     });
   });
 }

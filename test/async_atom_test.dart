@@ -163,7 +163,8 @@ void main() {
           await Future.delayed(Duration(milliseconds: 10));
           throw Exception('Test error');
         });
-      } catch (e) {
+        fail('Should have thrown an exception');
+      } on Exception catch (e) {
         expect(e.toString(), contains('Test error'));
       }
 

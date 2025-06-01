@@ -170,22 +170,18 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
     try {
       final result = await operation();
 
-      // Only update if this is still the current operation
       if (_currentOperation == completer && !completer.isCompleted) {
         set(AsyncValue.success(result));
         completer.complete(result);
       }
-
-      return result;
     } catch (error, stackTrace) {
-      // Only update if this is still the current operation
       if (_currentOperation == completer && !completer.isCompleted) {
         set(AsyncValue.error(error, stackTrace, data: previousData));
         completer.completeError(error, stackTrace);
       }
-
-      rethrow;
     }
+
+    return completer.future;
   }
 
   /// Execute and store operation for refresh capability
