@@ -137,8 +137,9 @@ class AsyncValue<T> {
 
 /// An atom that manages async operations and their states
 class AsyncAtom<T> extends Atom<AsyncValue<T>> {
-  Completer<T>? _currentOperation;
+  int _operationId = 0;
   Future<T> Function()? _lastOperation;
+  AsyncValue<T>? _stateBeforeLoading; // Store state before loading
 
   AsyncAtom({
     AsyncValue<T>? initialValue,
@@ -157,11 +158,11 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
     Future<T> Function() operation, {
     bool keepPreviousData = false,
   }) async {
-    // Cancel any ongoing operation
-    _currentOperation?.complete();
+    // Store current state before setting loading
+    _stateBeforeLoading = value;
 
-    final completer = Completer<T>();
-    _currentOperation = completer;
+    // Increment operation ID to cancel previous operations
+    final currentOperationId = ++_operationId;
 
     // Set loading state
     final previousData = keepPreviousData ? value.data : null;
@@ -170,18 +171,22 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
     try {
       final result = await operation();
 
-      if (_currentOperation == completer && !completer.isCompleted) {
+      // Only update state if this is still the current operation
+      if (_operationId == currentOperationId) {
         set(AsyncValue.success(result));
-        completer.complete(result);
+        _stateBeforeLoading = null; // Clear stored state
       }
-    } catch (error, stackTrace) {
-      if (_currentOperation == completer && !completer.isCompleted) {
-        set(AsyncValue.error(error, stackTrace, data: previousData));
-        completer.completeError(error, stackTrace);
-      }
-    }
 
-    return completer.future;
+      return result;
+    } catch (error, stackTrace) {
+      // Only update state if this is still the current operation
+      if (_operationId == currentOperationId) {
+        set(AsyncValue.error(error, stackTrace, data: previousData));
+        _stateBeforeLoading = null; // Clear stored state
+      }
+
+      rethrow;
+    }
   }
 
   /// Execute and store operation for refresh capability
@@ -203,13 +208,19 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
 
   /// Cancel the current operation
   void cancel() {
-    _currentOperation?.complete();
-    _currentOperation = null;
+    _operationId++;
+
+    // Restore previous state if we were loading
+    if (value.isLoading && _stateBeforeLoading != null) {
+      set(_stateBeforeLoading!);
+      _stateBeforeLoading = null;
+    }
   }
 
   /// Clear the current state back to idle
   void clear() {
-    cancel();
+    _operationId++;
+    _stateBeforeLoading = null;
     set(const AsyncValue.idle());
   }
 
