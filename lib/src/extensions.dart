@@ -25,8 +25,12 @@ extension AtomExtensions<T> on Atom<T> {
   Stream<T> asStream() {
     final controller = StreamController<T>.broadcast();
 
-    // Add current value
-    controller.add(value);
+    // Add current value asynchronously
+    scheduleMicrotask(() {
+      if (!controller.isClosed) {
+        controller.add(value);
+      }
+    });
 
     // Setup listener
     void listener(T value) {
@@ -40,7 +44,9 @@ extension AtomExtensions<T> on Atom<T> {
     // Close controller when stream is done
     controller.onCancel = () {
       removeListener(listener);
-      controller.close();
+      if (!controller.isClosed) {
+        controller.close();
+      }
     };
 
     return controller.stream;
@@ -100,10 +106,16 @@ extension AtomExtensions<T> on Atom<T> {
     DateTime? lastUpdate;
 
     addListener((newValue) {
-      final now = DateTime.now();
-      if (lastUpdate == null || now.difference(lastUpdate!) >= duration) {
-        throttledAtom.set(newValue);
-        lastUpdate = now;
+      try {
+        final now = DateTime.now();
+        if (lastUpdate == null || now.difference(lastUpdate!) >= duration) {
+          throttledAtom.set(newValue);
+          lastUpdate = now;
+        }
+      } catch (e) {
+        if (Atom.debugMode) {
+          print('AtomicFlutter: Throttle error in atom ${id}: $e');
+        }
       }
     });
 
@@ -138,8 +150,14 @@ extension AtomExtensions<T> on Atom<T> {
     final filteredAtom = Atom<T>(value, autoDispose: true);
 
     addListener((newValue) {
-      if (predicate(newValue)) {
-        filteredAtom.set(newValue);
+      try {
+        if (predicate(newValue)) {
+          filteredAtom.set(newValue);
+        }
+      } catch (e) {
+        if (Atom.debugMode) {
+          print('AtomicFlutter: Filter predicate error in atom ${id}: $e');
+        }
       }
     });
 

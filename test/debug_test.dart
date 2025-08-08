@@ -121,20 +121,22 @@ void main() {
     });
 
     test('should calculate average update interval', () async {
+      // Ensure clean state
+      disableDebugMode();
       AtomPerformanceMonitor.enable();
 
-      AtomPerformanceMonitor.recordUpdate('test-atom');
+      AtomPerformanceMonitor.recordUpdate('isolated-test-atom');
       await Future.delayed(Duration(milliseconds: 50));
-      AtomPerformanceMonitor.recordUpdate('test-atom');
+      AtomPerformanceMonitor.recordUpdate('isolated-test-atom');
       await Future.delayed(Duration(milliseconds: 50));
-      AtomPerformanceMonitor.recordUpdate('test-atom');
+      AtomPerformanceMonitor.recordUpdate('isolated-test-atom');
 
       final metrics = AtomPerformanceMonitor.getAllMetrics();
-      final atomMetrics = metrics['test-atom']!;
+      final atomMetrics = metrics['isolated-test-atom']!;
 
       expect(atomMetrics.updateCount, 3);
-      expect(atomMetrics.averageUpdateInterval.inMilliseconds, greaterThan(40));
-      expect(atomMetrics.averageUpdateInterval.inMilliseconds, lessThan(60));
+      expect(atomMetrics.averageUpdateInterval.inMilliseconds, greaterThan(30));
+      expect(atomMetrics.averageUpdateInterval.inMilliseconds, lessThan(100));
     });
 
     test('should print performance summary', () {

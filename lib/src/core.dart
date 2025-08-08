@@ -75,6 +75,7 @@ class Atom<T> {
 
     if (debugMode) {
       print('AtomicFlutter: Updated atom $_id: $oldValue -> $newValue');
+      AtomPerformanceMonitor.recordUpdate(_id);
     }
 
     _notifyListeners();
@@ -224,7 +225,13 @@ class Atom<T> {
     }
 
     for (final callback in _disposeCallbacks) {
-      callback();
+      try {
+        callback();
+      } catch (e) {
+        if (debugMode) {
+          print('AtomicFlutter: Error in dispose callback for atom $_id: $e');
+        }
+      }
     }
     _disposeCallbacks.clear();
 
@@ -246,6 +253,9 @@ class Atom<T> {
     // Cancel any pending timer
     _disposeTimer?.cancel();
     _disposeTimer = null;
+
+    // Reset reference count to prevent further disposal attempts
+    _refCount = 0;
   }
 
   @override
@@ -352,17 +362,16 @@ class AtomFamily<T, K> {
 /// Internal listener class to manage subscriptions
 class _AtomListener<T> {
   final void Function(T value) callback;
-  final int _callbackIdentity;
 
-  _AtomListener(this.callback) : _callbackIdentity = callback.hashCode;
+  _AtomListener(this.callback);
 
   void _notify(T value) => callback(value);
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is _AtomListener && _callbackIdentity == other._callbackIdentity;
+      (other is _AtomListener<T> && identical(callback, other.callback));
 
   @override
-  int get hashCode => _callbackIdentity;
+  int get hashCode => identityHashCode(callback);
 }

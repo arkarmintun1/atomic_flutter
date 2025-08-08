@@ -41,11 +41,12 @@ void main() {
     });
 
     group('asStream', () {
-      test('should emit current value immediately', () {
+      test('should emit current value immediately', () async {
         final atom = Atom<String>('initial');
         final stream = atom.asStream();
 
-        expect(stream, emits('initial'));
+        final firstValue = await stream.first;
+        expect(firstValue, 'initial');
       });
 
       test('should emit new values when atom changes', () async {
@@ -55,13 +56,16 @@ void main() {
         final values = <int>[];
         final subscription = stream.listen(values.add);
 
+        // Wait for initial value to be emitted
+        await Future.delayed(Duration(milliseconds: 10));
+        
         atom.set(2);
         atom.set(3);
 
         await Future.delayed(Duration(milliseconds: 10));
 
         expect(values, [1, 2, 3]);
-        subscription.cancel();
+        await subscription.cancel();
       });
 
       test('should handle stream cancellation', () async {
@@ -368,6 +372,9 @@ void main() {
 
         await asyncAtom1.execute(() async => 42);
 
+        // Wait for chaining to complete
+        await Future.delayed(Duration(milliseconds: 10));
+
         expect(asyncAtom2.value.hasValue, true);
         expect(asyncAtom2.value.value, '42');
       });
@@ -482,7 +489,7 @@ void main() {
       final baseAtom = Atom<int>(0);
       int computeCount = 0;
 
-      final computedAsyncT = computedAsync<String>(
+      computedAsync<String>(
         () async {
           computeCount++;
           return 'Count: $computeCount';
@@ -500,7 +507,7 @@ void main() {
       await Future.delayed(Duration(milliseconds: 100));
 
       // Should only compute once due to debouncing (plus initial)
-      expect(computedAsyncT, lessThanOrEqualTo(2));
+      expect(computeCount, lessThanOrEqualTo(2));
     });
   });
 

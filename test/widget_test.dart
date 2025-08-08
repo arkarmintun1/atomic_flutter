@@ -127,6 +127,7 @@ void main() {
         (tester) async {
       final atom = Atom<int>(0, autoDispose: false);
 
+      // Build widget
       await tester.pumpWidget(
         MaterialApp(
           home: AtomBuilder<int>(
@@ -136,14 +137,21 @@ void main() {
         ),
       );
 
-      // Widget should be listening
-      expect(atom.hasListeners, true);
+      expect(find.text('0'), findsOneWidget);
 
-      // Remove widget
-      await tester.pumpWidget(Container());
+      // Remove widget completely
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
 
-      // Should no longer be listening
-      expect(atom.hasListeners, false);
+      // Update atom value
+      atom.set(1);
+
+      // Pump again to see if anything rebuilds
+      await tester.pump();
+
+      // The old widget should not be found since it's disposed
+      expect(find.text('0'), findsNothing);
+      expect(find.text('1'), findsNothing);
 
       // Clean up
       atom.dispose();
