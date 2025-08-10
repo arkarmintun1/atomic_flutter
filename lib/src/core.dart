@@ -1,5 +1,5 @@
 import 'dart:async';
-
+import 'package:atomic_flutter/src/debug.dart';
 import 'package:flutter/widgets.dart';
 
 /// A single atomic unit of state
@@ -41,6 +41,7 @@ class Atom<T> {
         _disposeTimeout = disposeTimeout {
     if (debugMode) {
       print('AtomicFlutter: Created atom $_id with initial value: $_value');
+      AtomDebugger.register(this);
     }
   }
 
@@ -49,6 +50,18 @@ class Atom<T> {
 
   /// Unique ID of this atom
   String get id => _id;
+
+  /// Whether this atom should be automatically disposed when no longer used
+  bool get autoDispose => _autoDispose;
+
+  /// How long to wait before disposing unused atoms
+  Duration? get disposeTimeout => _disposeTimeout;
+
+  /// Number of active listeners
+  int get refCount => _refCount;
+
+  /// Whether this atom has any listeners
+  bool get hasListeners => _listeners.isNotEmpty;
 
   /// Update the atom value with explicit mutation
   ///
@@ -61,7 +74,8 @@ class Atom<T> {
     _value = newValue;
 
     if (debugMode) {
-      print('Atomic: Updated atom $_id: $oldValue -> $newValue');
+      print('AtomicFlutter: Updated atom $_id: $oldValue -> $newValue');
+      AtomPerformanceMonitor.recordUpdate(_id);
     }
 
     _notifyListeners();
@@ -94,7 +108,9 @@ class Atom<T> {
 
     // Notify active dependents
     for (final dependent in activeDependents) {
-      (dependent as _ComputedAtom)._computeValue();
+      if (dependent is _ComputedAtom) {
+        dependent._computeValue();
+      }
     }
 
     // Then notify UI listeners
@@ -160,7 +176,7 @@ class Atom<T> {
     _disposeTimer = null;
 
     if (debugMode) {
-      print('Atomic: Incremented ref count for atom $_id: $_refCount');
+      print('AtomicFlutter: Incremented ref count for atom $_id: $_refCount');
     }
   }
 
@@ -169,7 +185,7 @@ class Atom<T> {
     _refCount--;
 
     if (debugMode) {
-      print('Atomic: Decremented ref count for atom $_id: $_refCount');
+      print('AtomicFlutter: Decremented ref count for atom $_id: $_refCount');
     }
 
     // If auto-dispose is enabled and no more references, schedule disposal
@@ -188,7 +204,7 @@ class Atom<T> {
 
     if (debugMode) {
       print(
-          'Atomic: Scheduling dispose for atom $_id in ${timeout.inSeconds} seconds');
+          'AtomicFlutter: Scheduling dispose for atom $_id in ${timeout.inSeconds} seconds');
     }
 
     _disposeTimer = Timer(timeout, () {
@@ -204,11 +220,18 @@ class Atom<T> {
   /// This will remove all listeners and references to this atom.
   void dispose() {
     if (debugMode) {
-      print('Atomic: Disposing atom $_id');
+      print('AtomicFlutter: Disposing atom $_id');
+      AtomDebugger.unregister(this);
     }
 
     for (final callback in _disposeCallbacks) {
-      callback();
+      try {
+        callback();
+      } catch (e) {
+        if (debugMode) {
+          print('AtomicFlutter: Error in dispose callback for atom $_id: $e');
+        }
+      }
     }
     _disposeCallbacks.clear();
 
@@ -230,14 +253,24 @@ class Atom<T> {
     // Cancel any pending timer
     _disposeTimer?.cancel();
     _disposeTimer = null;
+
+    // Reset reference count to prevent further disposal attempts
+    _refCount = 0;
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) || other is Atom && _id == other._id;
+
+  @override
+  int get hashCode => _id.hashCode;
 
   @override
   String toString() => 'Atom<$T>($_id, $_value, refs: $_refCount)';
 }
 
 class _ComputedAtom<T> extends Atom<T> {
-  final Function() _computeFunction;
+  final T Function() _computeFunction;
 
   _ComputedAtom(
     T initialValue,
@@ -253,7 +286,10 @@ class _ComputedAtom<T> extends Atom<T> {
         );
 
   void _computeValue() {
-    set(_computeFunction());
+    final newValue = _computeFunction();
+    if (newValue != value) {
+      set(newValue);
+    }
   }
 }
 
@@ -290,20 +326,52 @@ Atom<R> computed<R>(
   return derivedAtom;
 }
 
+/// Atom family for creating related atoms with different keys
+class AtomFamily<T, K> {
+  final Map<K, Atom<T>> _atoms = {};
+  final Atom<T> Function(K key) _creator;
+
+  AtomFamily(this._creator);
+
+  /// Get or create an atom for the given key
+  Atom<T> call(K key) {
+    return _atoms.putIfAbsent(key, () => _creator(key));
+  }
+
+  /// Dispose a specific atom by key
+  void disposeKey(K key) {
+    final atom = _atoms.remove(key);
+    atom?.dispose();
+  }
+
+  /// Dispose all atoms in this family
+  void dispose() {
+    for (final atom in _atoms.values) {
+      atom.dispose();
+    }
+    _atoms.clear();
+  }
+
+  /// Get all active keys
+  Iterable<K> get keys => _atoms.keys;
+
+  /// Get all active atoms
+  Iterable<Atom<T>> get atoms => _atoms.values;
+}
+
 /// Internal listener class to manage subscriptions
 class _AtomListener<T> {
   final void Function(T value) callback;
-  final int _callbackIdentity;
 
-  _AtomListener(this.callback) : _callbackIdentity = callback.hashCode;
+  _AtomListener(this.callback);
 
   void _notify(T value) => callback(value);
 
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is _AtomListener && _callbackIdentity == other._callbackIdentity;
+      (other is _AtomListener<T> && identical(callback, other.callback));
 
   @override
-  int get hashCode => _callbackIdentity;
+  int get hashCode => identityHashCode(callback);
 }

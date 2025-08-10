@@ -23,6 +23,17 @@ AtomicFlutter is a lightweight, reactive state management solution for Flutter a
     - [AtomBuilder](#atombuilder)
     - [MultiAtomBuilder](#multiatombuilder)
     - [AtomSelector](#atomselector)
+  - [Async State Management](#async-state-management)
+    - [AsyncAtom](#asyncatom)
+    - [AsyncValue](#asyncvalue)
+    - [AsyncAtom Operations](#asyncatom-operations)
+  - [Async Widgets](#async-widgets)
+    - [AsyncAtomBuilder](#asyncatombuilder)
+    - [AsyncBuilder](#asyncbuilder)
+  - [Async Extensions](#async-extensions)
+    - [AsyncAtom Extensions](#asyncatom-extensions)
+    - [Atom to AsyncAtom Extensions](#atom-to-asyncatom-extensions)
+    - [Async Computed Functions](#async-computed-functions)
   - [Derived State](#derived-state)
   - [Domain-Specific Atoms](#domain-specific-atoms)
   - [Extensions](#extensions)
@@ -50,6 +61,7 @@ AtomicFlutter is a lightweight, reactive state management solution for Flutter a
   - [Real-World Examples](#real-world-examples)
     - [User Settings](#user-settings)
     - [Shopping Cart](#shopping-cart)
+    - [API Data Fetching](#api-data-fetching)
   - [Conclusion](#conclusion)
   - [License](#license)
 
@@ -75,7 +87,13 @@ AtomicFlutter is based on the concept of **atoms** - individual units of state t
 ### Key Features
 
 - 🔄 **Reactive State Management**: Automatically update UI when state changes
+- ⚡ **Async State Support**: Built-in loading, success, and error states for async operations
 - 🧩 **Composable Atoms**: Build complex state from simple primitives
+- 🔗 **Async Chaining & Composition**: Chain async operations and combine multiple async atoms
+- 🎯 **Specialized Async Widgets**: Ready-to-use widgets for common async patterns
+- 🔄 **Automatic Retry & Refresh**: Built-in retry mechanisms and pull-to-refresh support  
+- ⏱️ **Debouncing & Throttling**: Control async operation frequency
+- 💾 **Caching & TTL**: Built-in caching with time-to-live support
 - 🧠 **Domain-Driven Design**: Create domain-specific atoms with integrated business logic
 - 🚮 **Automatic Memory Management**: Dispose of unused state to prevent memory leaks
 - 📦 **Minimal Dependencies**: No external libraries required
@@ -167,6 +185,270 @@ AtomSelector<UserProfile, String>(
   builder: (context, name) {
     return Text('Name: $name');
   },
+);
+```
+
+## Async State Management
+
+AtomicFlutter provides powerful async state management capabilities through `AsyncAtom` and `AsyncValue`. These tools make it easy to handle loading states, errors, and data in your async operations.
+
+### AsyncAtom
+
+`AsyncAtom` is specialized for managing asynchronous operations with built-in loading, success, and error states:
+
+```dart
+// Create an AsyncAtom
+final userDataAtom = AsyncAtom<User>();
+
+// Execute async operations
+Future<void> fetchUserData() async {
+  await userDataAtom.execute(() async {
+    // Simulate API call
+    await Future.delayed(Duration(seconds: 2));
+    return User(id: 1, name: 'John Doe');
+  });
+}
+
+// Execute with previous data preservation
+await userDataAtom.execute(
+  () => api.refreshUserData(),
+  keepPreviousData: true, // Show previous data while loading
+);
+```
+
+### AsyncValue
+
+`AsyncValue` represents the state of an async operation and provides type-safe access to loading, success, and error states:
+
+```dart
+final asyncValue = userDataAtom.value;
+
+// Check states
+if (asyncValue.isLoading) {
+  // Show loading spinner
+} else if (asyncValue.hasError) {
+  // Handle error: asyncValue.error, asyncValue.stackTrace
+} else if (asyncValue.hasValue) {
+  // Use data: asyncValue.value
+}
+
+// Pattern matching approach
+final result = asyncValue.when(
+  idle: () => 'No data loaded',
+  loading: () => 'Loading...',
+  success: (data) => 'Loaded: ${data.name}',
+  error: (error, stackTrace) => 'Error: $error',
+);
+
+// Optional pattern matching
+final result = asyncValue.maybeWhen(
+  success: (data) => 'Success: ${data.name}',
+  orElse: () => 'Not loaded',
+);
+```
+
+### AsyncAtom Operations
+
+```dart
+// Execute and store operation for refresh capability
+await userAtom.executeAndStore(() => api.fetchUser());
+
+// Refresh the last operation
+await userAtom.refresh();
+
+// Cancel current operation
+userAtom.cancel();
+
+// Clear state back to idle
+userAtom.clear();
+
+// Set data directly (optimistic updates)
+userAtom.setData(user);
+
+// Set error state directly
+userAtom.setError(exception, stackTrace);
+```
+
+## Async Widgets
+
+AtomicFlutter provides two main widgets for working with `AsyncAtom` instances:
+
+### AsyncAtomBuilder
+
+Full control over all async states with custom builders:
+
+```dart
+AsyncAtomBuilder<User>(
+  atom: userAtom,
+  idle: (context) => Text('Press button to load'),
+  loading: (context, previousData) => Column(
+    children: [
+      CircularProgressIndicator(),
+      if (previousData != null) Text('Previous: ${previousData.name}'),
+    ],
+  ),
+  success: (context, user) => Text('Hello ${user.name}!'),
+  error: (context, error, stackTrace, previousData) => Column(
+    children: [
+      Text('Error: $error'),
+      ElevatedButton(
+        onPressed: () => userAtom.refresh(),
+        child: Text('Retry'),
+      ),
+    ],
+  ),
+);
+```
+
+### AsyncBuilder
+
+Main async builder widget with retry and refresh support:
+
+```dart
+// Basic usage with sensible defaults
+AsyncBuilder<User>(
+  atom: userAtom,
+  builder: (context, user) => Text('Hello ${user.name}!'),
+  // Optional custom widgets
+  loading: (context) => Text('Custom loading...'),
+  error: (context, error) => Text('Custom error: $error'),
+  idle: (context) => Text('Custom idle state'),
+);
+
+// With retry functionality
+AsyncBuilder<String>(
+  atom: dataAtom,
+  builder: (context, data) => Text('Data: $data'),
+  enableRetry: true,
+  retryOperation: () => api.fetchData(),
+  // Optional custom retry error widget
+  customRetryError: (context, error, retry) => Column(
+    children: [
+      Text('Error: $error'),
+      ElevatedButton(
+        onPressed: retry,
+        child: Text('Try Again'),
+      ),
+    ],
+  ),
+);
+
+// With pull-to-refresh support  
+AsyncBuilder<List<Post>>(
+  atom: postsAtom,
+  builder: (context, posts) => ListView.builder(
+    itemCount: posts.length,
+    itemBuilder: (context, index) => ListTile(
+      title: Text(posts[index].title),
+    ),
+  ),
+  enableRefresh: true,
+  onRefresh: () => api.fetchPosts(),
+);
+
+// Combine retry and refresh
+AsyncBuilder<List<Post>>(
+  atom: postsAtom,
+  builder: (context, posts) => ListView.builder(
+    itemCount: posts.length,
+    itemBuilder: (context, index) => ListTile(
+      title: Text(posts[index].title),
+    ),
+  ),
+  enableRetry: true,
+  retryOperation: () => api.fetchPosts(),
+  enableRefresh: true,
+  onRefresh: () => api.refreshPosts(),
+);
+```
+
+## Async Extensions
+
+### AsyncAtom Extensions
+
+Powerful extensions for AsyncAtom instances:
+
+```dart
+// Debounce async operations
+final debouncedSearchAtom = searchResultsAtom.debounceAsync(
+  Duration(milliseconds: 300)
+);
+
+// Map success values to another type
+final userNamesAtom = usersAtom.mapAsync((users) => 
+  users.map((user) => user.name).toList()
+);
+
+// Execute only if not currently loading
+await dataAtom.executeIfNotLoading(() => api.fetchData());
+
+// Execute with automatic retry
+await dataAtom.executeWithRetry(
+  () => api.fetchData(),
+  maxRetries: 3,
+  delay: Duration(seconds: 1), // Exponential backoff
+);
+
+// Chain async operations
+final processedDataAtom = rawDataAtom.chain((data) async {
+  return await processData(data);
+});
+
+// Create cached version with TTL
+final cachedDataAtom = dataAtom.cached(
+  ttl: Duration(minutes: 5),
+  refreshOnError: true,
+);
+```
+
+### Atom to AsyncAtom Extensions
+
+Convert regular atoms to async atoms:
+
+```dart
+// Convert regular atom to AsyncAtom
+final asyncUserAtom = userAtom.toAsync();
+
+// Create async atom that executes when regular atom changes
+final userPostsAtom = userIdAtom.asyncMap((userId) async {
+  return await api.fetchUserPosts(userId);
+});
+```
+
+### Async Computed Functions
+
+Create computed async atoms:
+
+```dart
+// Create async computed atom
+final userProfileAtom = computedAsync<UserProfile>(
+  () async {
+    final user = userAtom.value;
+    final settings = settingsAtom.value;
+    return await api.buildUserProfile(user, settings);
+  },
+  tracked: [userAtom, settingsAtom],
+  debounce: Duration(milliseconds: 500), // Debounce computations
+);
+
+// Combine multiple async atoms
+final combinedDataAtom = combineAsync([
+  userDataAtom,
+  settingsDataAtom,
+  preferencesAtom,
+]);
+
+// Access combined results
+combinedDataAtom.value.when(
+  success: (dataList) {
+    final userData = dataList[0];
+    final settingsData = dataList[1];
+    final preferences = dataList[2];
+    // Use all data together
+  },
+  loading: () => showLoading(),
+  error: (error, _) => showError(error),
+  idle: () => showIdle(),
 );
 ```
 
@@ -660,13 +942,182 @@ class CartController {
 }
 ```
 
+### API Data Fetching
+
+Complete example of async data fetching with error handling and caching:
+
+```dart
+// API service
+class ApiService {
+  static const baseUrl = 'https://api.example.com';
+  
+  Future<List<Post>> fetchPosts() async {
+    final response = await http.get(Uri.parse('$baseUrl/posts'));
+    if (response.statusCode == 200) {
+      final List<dynamic> data = json.decode(response.body);
+      return data.map((json) => Post.fromJson(json)).toList();
+    }
+    throw Exception('Failed to load posts');
+  }
+
+  Future<Post> fetchPost(int id) async {
+    final response = await http.get(Uri.parse('$baseUrl/posts/$id'));
+    if (response.statusCode == 200) {
+      return Post.fromJson(json.decode(response.body));
+    }
+    throw Exception('Failed to load post');
+  }
+}
+
+// Atoms for posts management
+final postsAtom = AsyncAtom<List<Post>>(autoDispose: false);
+final selectedPostAtom = Atom<Post?>(null);
+
+// Computed async atom for selected post details
+final postDetailsAtom = computedAsync<PostDetails?>(
+  () async {
+    final post = selectedPostAtom.value;
+    if (post == null) return null;
+    
+    // Fetch additional details for the selected post
+    return await ApiService().fetchPostDetails(post.id);
+  },
+  tracked: [selectedPostAtom],
+  debounce: Duration(milliseconds: 300),
+);
+
+// Posts list widget
+class PostsList extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text('Posts')),
+      body: AsyncBuilder<List<Post>>(
+        atom: postsAtom,
+        enableRefresh: true,
+        onRefresh: () => ApiService().fetchPosts(),
+        builder: (context, posts) => ListView.builder(
+          itemCount: posts.length,
+          itemBuilder: (context, index) {
+            final post = posts[index];
+            return AtomBuilder<Post?>(
+              atom: selectedPostAtom,
+              builder: (context, selectedPost) => ListTile(
+                title: Text(post.title),
+                subtitle: Text(post.excerpt),
+                selected: selectedPost?.id == post.id,
+                onTap: () => selectedPostAtom.set(post),
+              ),
+            );
+          },
+        ),
+        loading: (context) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('Loading posts...'),
+            ],
+          ),
+        ),
+        error: (context, error) => Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, size: 64, color: Colors.red),
+              SizedBox(height: 16),
+              Text('Failed to load posts: $error'),
+              SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => postsAtom.refresh(),
+                child: Text('Retry'),
+              ),
+            ],
+          ),
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          // Refresh posts with exponential backoff retry
+          postsAtom.executeWithRetry(
+            () => ApiService().fetchPosts(),
+            maxRetries: 3,
+            delay: Duration(seconds: 1),
+          );
+        },
+        child: Icon(Icons.refresh),
+      ),
+    );
+  }
+}
+
+// Post details widget
+class PostDetails extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return AtomBuilder<Post?>(
+      atom: selectedPostAtom,
+      builder: (context, selectedPost) {
+        if (selectedPost == null) {
+          return Center(child: Text('Select a post to view details'));
+        }
+
+        return AsyncBuilder<PostDetails?>(
+          atom: postDetailsAtom,
+          builder: (context, details) {
+            if (details == null) return SizedBox();
+            
+            return Padding(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    selectedPost.title,
+                    style: Theme.of(context).textTheme.headlineSmall,
+                  ),
+                  SizedBox(height: 16),
+                  Text(details.content),
+                  SizedBox(height: 16),
+                  Text(
+                    'Comments: ${details.commentCount}',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+}
+
+// App initialization
+void main() {
+  runApp(MyApp());
+  
+  // Load initial posts on app start
+  postsAtom.executeAndStore(() => ApiService().fetchPosts());
+}
+```
+
 See the [example folder](example/) for a full e-commerce app demo.
 
 ## Conclusion
 
-AtomicFlutter provides a lightweight, type-safe, and efficient way to manage state in Flutter applications. By focusing on small, composable atoms of state, it enables a reactive programming model with minimal boilerplate.
+AtomicFlutter provides a comprehensive, lightweight, and type-safe state management solution for Flutter applications. With its powerful async capabilities, specialized widgets, and extensive extension system, it handles everything from simple state management to complex async operations.
 
-Whether you're building a simple counter app or a complex e-commerce application, AtomicFlutter's flexible API and powerful features make it a great choice for state management.
+Key strengths:
+
+- **Complete Async Support**: From basic loading states to advanced retry mechanisms and caching
+- **Widget Ecosystem**: Specialized widgets for every async pattern you'll encounter
+- **Developer Experience**: Type-safe APIs, automatic memory management, and powerful debugging tools
+- **Production Ready**: Built-in error handling, retry logic, and performance optimizations
+- **Flexible Architecture**: Works equally well for simple apps and complex enterprise applications
+
+Whether you're building a simple counter app, a data-heavy dashboard, or a complex e-commerce application with real-time updates, AtomicFlutter's flexible API and comprehensive feature set make it an excellent choice for modern Flutter development.
 
 For more detailed examples and advanced usage patterns, check out the example applications included in the package.
 

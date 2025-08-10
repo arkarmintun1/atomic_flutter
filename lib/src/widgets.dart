@@ -90,7 +90,7 @@ class MultiAtomBuilder extends StatefulWidget {
 }
 
 class _MultiAtomBuilderState extends State<MultiAtomBuilder> {
-  final Map<Atom, VoidCallback> _listeners = {};
+  final Map<Atom, void Function(dynamic)> _listeners = {};
 
   @override
   void initState() {
@@ -109,8 +109,8 @@ class _MultiAtomBuilderState extends State<MultiAtomBuilder> {
 
   void _setupListeners() {
     for (final atom in widget.atoms) {
-      final listener = () => _onAtomChanged();
-      atom.addListener((value) => listener());
+      void listener(dynamic value) => _onAtomChanged();
+      atom.addListener(listener);
       _listeners[atom] = listener;
     }
   }
@@ -119,7 +119,7 @@ class _MultiAtomBuilderState extends State<MultiAtomBuilder> {
     for (final entry in _listeners.entries) {
       final atom = entry.key;
       final listener = entry.value;
-      atom.removeListener((value) => listener());
+      atom.removeListener(listener);
     }
     _listeners.clear();
   }
@@ -188,6 +188,16 @@ class _AtomSelectorState<T, S> extends State<AtomSelector<T, S>> {
   }
 
   @override
+  void didUpdateWidget(AtomSelector<T, S> oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.atom != widget.atom) {
+      oldWidget.atom.removeListener(_onStateChanged);
+      selectedValue = widget.selector(widget.atom.value);
+      widget.atom.addListener(_onStateChanged);
+    }
+  }
+
+  @override
   void dispose() {
     widget.atom.removeListener(_onStateChanged);
     super.dispose();
@@ -205,5 +215,32 @@ class _AtomSelectorState<T, S> extends State<AtomSelector<T, S>> {
   @override
   Widget build(BuildContext context) {
     return widget.builder(context, selectedValue);
+  }
+}
+
+/// Widget that provides atom value and an optional static child
+class AtomConsumer<T> extends StatelessWidget {
+  /// The atom to subscribe to
+  final Atom<T> atom;
+
+  /// Builder function that receives the current value and child
+  final Widget Function(BuildContext context, T value, Widget? child) builder;
+
+  /// Optional child widget that won't rebuild when atom changes
+  final Widget? child;
+
+  const AtomConsumer({
+    Key? key,
+    required this.atom,
+    required this.builder,
+    this.child,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return AtomBuilder<T>(
+      atom: atom,
+      builder: (context, value) => builder(context, value, child),
+    );
   }
 }
