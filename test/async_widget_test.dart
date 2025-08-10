@@ -181,7 +181,7 @@ void main() {
     });
   });
 
-  group('SimpleAsyncBuilder Tests', () {
+  group('AsyncBuilder Tests', () {
     late List<AsyncAtom> atomsToCleanup;
 
     setUp(() {
@@ -203,7 +203,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: SimpleAsyncBuilder<String>(
+          home: AsyncBuilder<String>(
             atom: asyncAtom,
             builder: (context, data) => Text('Data: $data'),
           ),
@@ -211,7 +211,7 @@ void main() {
       );
 
       // Start async operation
-      final future = asyncAtom.execute(() async {
+      asyncAtom.execute(() async {
         await Future.delayed(Duration(milliseconds: 100));
         return 'Result';
       });
@@ -219,9 +219,9 @@ void main() {
       await tester.pump();
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-      // Wait for completion with timeout
-      await future.timeout(Duration(seconds: 2));
+      // Wait for completion
       await tester.pumpAndSettle();
+      expect(find.text('Data: Result'), findsOneWidget);
     });
 
     testWidgets('should use custom loading widget', (tester) async {
@@ -230,7 +230,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: SimpleAsyncBuilder<String>(
+          home: AsyncBuilder<String>(
             atom: asyncAtom,
             builder: (context, data) => Text('Data: $data'),
             loading: (context) => Text('Custom Loading'),
@@ -239,7 +239,7 @@ void main() {
       );
 
       // Start async operation
-      final future = asyncAtom.execute(() async {
+      asyncAtom.execute(() async {
         await Future.delayed(Duration(milliseconds: 100));
         return 'Result';
       });
@@ -247,8 +247,9 @@ void main() {
       await tester.pump();
       expect(find.text('Custom Loading'), findsOneWidget);
 
-      await future.timeout(Duration(seconds: 2));
+      // Wait for completion
       await tester.pumpAndSettle();
+      expect(find.text('Data: Result'), findsOneWidget);
     });
 
     testWidgets('should show success data', (tester) async {
@@ -257,7 +258,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: SimpleAsyncBuilder<String>(
+          home: AsyncBuilder<String>(
             atom: asyncAtom,
             builder: (context, data) => Text('Data: $data'),
           ),
@@ -276,7 +277,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: SimpleAsyncBuilder<String>(
+          home: AsyncBuilder<String>(
             atom: asyncAtom,
             builder: (context, data) => Text('Data: $data'),
           ),
@@ -300,7 +301,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: SimpleAsyncBuilder<String>(
+          home: AsyncBuilder<String>(
             atom: asyncAtom,
             builder: (context, data) => Text('Data: $data'),
             error: (context, error) => Text('Custom Error: $error'),
@@ -320,7 +321,7 @@ void main() {
     });
   });
 
-  group('AsyncRetryBuilder Tests', () {
+  group('AsyncBuilder Retry Tests', () {
     late List<AsyncAtom> atomsToCleanup;
 
     setUp(() {
@@ -350,9 +351,10 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: AsyncRetryBuilder<String>(
+          home: AsyncBuilder<String>(
             atom: asyncAtom,
-            operation: operation,
+            enableRetry: true,
+            retryOperation: operation,
             builder: (context, data) => Text('Data: $data'),
           ),
         ),
@@ -372,36 +374,39 @@ void main() {
       // Tap retry button
       shouldFail = false;
       await tester.tap(find.text('Retry'));
-      await tester.pump();
-
-      // Should show loading initially
-      expect(find.byType(CircularProgressIndicator), findsOneWidget);
-
-      // Wait for completion
+      
+      // Wait for completion and verify success
       await tester.pumpAndSettle();
+      expect(find.text('Data: Success after retry'), findsOneWidget);
     });
 
     testWidgets('should use custom error widget with retry', (tester) async {
       final asyncAtom = AsyncAtom<String>(autoDispose: false);
       atomsToCleanup.add(asyncAtom);
       int retryCount = 0;
+      bool shouldFail = true;
 
       Future<String> operation() async {
-        throw Exception('Always fails');
+        if (shouldFail && retryCount == 0) {
+          throw Exception('Always fails');
+        }
+        return 'Success after retry';
       }
 
       await tester.pumpWidget(
         MaterialApp(
-          home: AsyncRetryBuilder<String>(
+          home: AsyncBuilder<String>(
             atom: asyncAtom,
-            operation: operation,
+            enableRetry: true,
+            retryOperation: operation,
             builder: (context, data) => Text('Data: $data'),
-            error: (context, error, retry) => Column(
+            customRetryError: (context, error, retry) => Column(
               children: [
                 Text('Custom Error: $error'),
                 ElevatedButton(
                   onPressed: () {
                     retryCount++;
+                    shouldFail = false;
                     retry();
                   },
                   child: Text('Custom Retry'),
@@ -425,11 +430,16 @@ void main() {
 
       // Tap custom retry button
       await tester.tap(find.text('Custom Retry'));
+      await tester.pump();
+      
+      // Verify retry was called and wait for completion
       expect(retryCount, 1);
+      await tester.pumpAndSettle();
+      expect(find.text('Data: Success after retry'), findsOneWidget);
     });
   });
 
-  group('AsyncRefreshBuilder Tests', () {
+  group('AsyncBuilder Refresh Tests', () {
     late List<AsyncAtom> atomsToCleanup;
 
     setUp(() {
@@ -457,10 +467,19 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: AsyncRefreshBuilder<String>(
-            atom: asyncAtom,
-            onRefresh: refreshOperation,
-            builder: (context, data) => Text('Data: $data'),
+          home: Scaffold(
+            body: AsyncBuilder<String>(
+              atom: asyncAtom,
+              enableRefresh: true,
+              onRefresh: refreshOperation,
+              builder: (context, data) => ListView(
+                children: [
+                  Text('Data: $data'),
+                  // Add some height to make it scrollable
+                  const SizedBox(height: 1000),
+                ],
+              ),
+            ),
           ),
         ),
       );
@@ -471,10 +490,9 @@ void main() {
 
       expect(find.text('Data: Refreshed 1'), findsOneWidget);
 
-      // Pull to refresh
-      await tester.fling(find.byType(RefreshIndicator), Offset(0, 300), 1000);
-      await tester.pump();
-      await tester.pump(Duration(seconds: 1));
+      // Pull to refresh using ListView instead of RefreshIndicator
+      await tester.drag(find.byType(ListView), const Offset(0, 300));
+      await tester.pumpAndSettle();
 
       expect(refreshCount, 2);
     });
@@ -485,10 +503,10 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: AsyncRefreshBuilder<String>(
+          home: AsyncBuilder<String>(
             atom: asyncAtom,
-            onRefresh: () async => 'data',
             enableRefresh: false,
+            onRefresh: () async => 'data',
             builder: (context, data) => Text('Data: $data'),
           ),
         ),

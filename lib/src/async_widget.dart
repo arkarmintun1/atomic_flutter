@@ -36,114 +36,35 @@ class AsyncAtomBuilder<T> extends StatelessWidget {
   }
 }
 
-/// Simplified async builder with sensible defaults
-class SimpleAsyncBuilder<T> extends StatelessWidget {
+/// Main async builder widget with retry and refresh support
+class AsyncBuilder<T> extends StatelessWidget {
   final AsyncAtom<T> atom;
   final Widget Function(BuildContext context, T data) builder;
   final Widget Function(BuildContext context)? loading;
   final Widget Function(BuildContext context, Object error)? error;
   final Widget Function(BuildContext context)? idle;
+  
+  // Retry functionality
+  final bool enableRetry;
+  final Future<T> Function()? retryOperation;
+  final Widget Function(BuildContext context, Object error, VoidCallback retry)? customRetryError;
+  
+  // Refresh functionality
+  final bool enableRefresh;
+  final Future<T> Function()? onRefresh;
 
-  const SimpleAsyncBuilder({
+  const AsyncBuilder({
     super.key,
     required this.atom,
     required this.builder,
     this.loading,
     this.error,
     this.idle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AtomBuilder<AsyncValue<T>>(
-      atom: atom,
-      builder: (context, asyncValue) {
-        return asyncValue.maybeWhen(
-          idle: () => idle?.call(context) ?? const SizedBox.shrink(),
-          loading: () =>
-              loading?.call(context) ??
-              const Center(child: CircularProgressIndicator()),
-          success: (data) => builder(context, data),
-          error: (err, _) =>
-              error?.call(context, err) ?? Center(child: Text('Error: $err')),
-          orElse: () => const SizedBox.shrink(),
-        );
-      },
-    );
-  }
-}
-
-/// Widget for handling async operations with retry functionality
-class AsyncRetryBuilder<T> extends StatelessWidget {
-  final AsyncAtom<T> atom;
-  final Widget Function(BuildContext context, T data) builder;
-  final Widget Function(BuildContext context)? loading;
-  final Widget Function(BuildContext context, Object error, VoidCallback retry)?
-      error;
-  final Future<T> Function() operation;
-
-  const AsyncRetryBuilder({
-    super.key,
-    required this.atom,
-    required this.builder,
-    required this.operation,
-    this.loading,
-    this.error,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AtomBuilder<AsyncValue<T>>(
-      atom: atom,
-      builder: (context, asyncValue) {
-        return asyncValue.maybeWhen(
-          loading: () =>
-              loading?.call(context) ??
-              const Center(child: CircularProgressIndicator()),
-          success: (data) => builder(context, data),
-          error: (err, _) =>
-              error?.call(
-                context,
-                err,
-                () => atom.execute(operation),
-              ) ??
-              Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text('Error: $err'),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => atom.execute(operation),
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
-              ),
-          orElse: () => const SizedBox.shrink(),
-        );
-      },
-    );
-  }
-}
-
-/// Widget that handles async operations with pull-to-refresh
-class AsyncRefreshBuilder<T> extends StatelessWidget {
-  final AsyncAtom<T> atom;
-  final Widget Function(BuildContext context, T data) builder;
-  final Widget Function(BuildContext context)? loading;
-  final Widget Function(BuildContext context, Object error)? error;
-  final Future<T> Function() onRefresh;
-  final bool enableRefresh;
-
-  const AsyncRefreshBuilder({
-    super.key,
-    required this.atom,
-    required this.builder,
-    required this.onRefresh,
-    this.loading,
-    this.error,
-    this.enableRefresh = true,
+    this.enableRetry = false,
+    this.retryOperation,
+    this.customRetryError,
+    this.enableRefresh = false,
+    this.onRefresh,
   });
 
   @override
@@ -152,21 +73,22 @@ class AsyncRefreshBuilder<T> extends StatelessWidget {
       atom: atom,
       builder: (context, asyncValue) {
         return asyncValue.maybeWhen(
+          idle: () => idle?.call(context) ?? const SizedBox.shrink(),
           loading: () =>
               loading?.call(context) ??
               const Center(child: CircularProgressIndicator()),
           success: (data) => builder(context, data),
-          error: (err, _) =>
-              error?.call(context, err) ?? Center(child: Text('Error: $err')),
+          error: (err, _) => _buildErrorWidget(context, err),
           orElse: () => const SizedBox.shrink(),
         );
       },
     );
 
-    if (enableRefresh) {
+    // Wrap with RefreshIndicator if refresh is enabled
+    if (enableRefresh && onRefresh != null) {
       return RefreshIndicator(
         onRefresh: () async {
-          await atom.execute(onRefresh);
+          await atom.execute(onRefresh!);
         },
         child: content,
       );
@@ -174,4 +96,41 @@ class AsyncRefreshBuilder<T> extends StatelessWidget {
 
     return content;
   }
+
+  Widget _buildErrorWidget(BuildContext context, Object err) {
+    // Use custom retry error widget if provided and retry is enabled
+    if (enableRetry && retryOperation != null && customRetryError != null) {
+      return customRetryError!(
+        context,
+        err,
+        () => atom.execute(retryOperation!),
+      );
+    }
+    
+    // Use default retry error widget if retry is enabled
+    if (enableRetry && retryOperation != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text('Error: $err'),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () => atom.execute(retryOperation!),
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    // Use custom error widget if provided
+    if (error != null) {
+      return error!(context, err);
+    }
+    
+    // Default error widget
+    return Center(child: Text('Error: $err'));
+  }
 }
+
