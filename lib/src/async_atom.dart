@@ -68,7 +68,7 @@ class AsyncValue<T> {
   AsyncValue<R> map<R>(R Function(T data) mapper) {
     if (hasValue) {
       try {
-        return AsyncValue.success(mapper(data!));
+        return AsyncValue.success(mapper(data as T));
       } catch (e, stack) {
         return AsyncValue.error(e, stack);
       }
@@ -94,7 +94,7 @@ class AsyncValue<T> {
       case AsyncState.loading:
         return loading();
       case AsyncState.success:
-        return success(data!);
+        return success(data as T);
       case AsyncState.error:
         return error(this.error!, stackTrace!);
     }
