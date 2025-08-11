@@ -284,16 +284,16 @@ void main() {
     test('should handle dead dependency references gracefully', () {
       final baseAtom = Atom<int>(5);
       late Atom<int> computedAtom;
-      
+
       // Create computed atom in separate scope
       computedAtom = computed(() => baseAtom.value * 2, tracked: [baseAtom]);
-      
+
       expect(computedAtom.value, 10);
-      
+
       // Force garbage collection scenario by nullifying computed reference
       // This tests the weak reference cleanup in _notifyListeners
       expect(() => baseAtom.set(10), returnsNormally);
-      
+
       // The base atom should handle the dead reference gracefully
       expect(baseAtom.value, 10);
     });

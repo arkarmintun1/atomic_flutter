@@ -43,12 +43,13 @@ class AsyncBuilder<T> extends StatelessWidget {
   final Widget Function(BuildContext context)? loading;
   final Widget Function(BuildContext context, Object error)? error;
   final Widget Function(BuildContext context)? idle;
-  
+
   // Retry functionality
   final bool enableRetry;
   final Future<T> Function()? retryOperation;
-  final Widget Function(BuildContext context, Object error, VoidCallback retry)? customRetryError;
-  
+  final Widget Function(BuildContext context, Object error, VoidCallback retry)?
+      customRetryError;
+
   // Refresh functionality
   final bool enableRefresh;
   final Future<T> Function()? onRefresh;
@@ -106,7 +107,7 @@ class AsyncBuilder<T> extends StatelessWidget {
         () => atom.execute(retryOperation!),
       );
     }
-    
+
     // Use default retry error widget if retry is enabled
     if (enableRetry && retryOperation != null) {
       return Center(
@@ -123,14 +124,13 @@ class AsyncBuilder<T> extends StatelessWidget {
         ),
       );
     }
-    
+
     // Use custom error widget if provided
     if (error != null) {
       return error!(context, err);
     }
-    
+
     // Default error widget
     return Center(child: Text('Error: $err'));
   }
 }
-

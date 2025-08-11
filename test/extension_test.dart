@@ -58,7 +58,7 @@ void main() {
 
         // Wait for initial value to be emitted
         await Future.delayed(Duration(milliseconds: 10));
-        
+
         atom.set(2);
         atom.set(3);
 

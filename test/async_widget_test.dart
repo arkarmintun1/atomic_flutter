@@ -374,7 +374,7 @@ void main() {
       // Tap retry button
       shouldFail = false;
       await tester.tap(find.text('Retry'));
-      
+
       // Wait for completion and verify success
       await tester.pumpAndSettle();
       expect(find.text('Data: Success after retry'), findsOneWidget);
@@ -431,7 +431,7 @@ void main() {
       // Tap custom retry button
       await tester.tap(find.text('Custom Retry'));
       await tester.pump();
-      
+
       // Verify retry was called and wait for completion
       expect(retryCount, 1);
       await tester.pumpAndSettle();
