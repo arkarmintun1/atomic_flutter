@@ -4,6 +4,12 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.2.1] - 2025-08-11
+
+### Fixed
+
+- Code linting issues
+
 ## [0.2.0] - 2025-08-11
 
 ### Added
@@ -12,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **AsyncState enum**: `idle`, `loading`, `success`, and `error` states
 - **AsyncAtomBuilder**: Widget for building UI based on async atom states
 - **AsyncBuilder**: Simplified async widget with retry and refresh support
-- **Async Extensions**: 
+- **Async Extensions**:
   - `debounceAsync()` - Debounced async operations
   - `mapAsync()` - Transform async values
   - `executeIfNotLoading()` - Conditional execution
