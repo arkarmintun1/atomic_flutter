@@ -24,8 +24,8 @@ void main() {
     test('should register atoms in debug mode', () {
       enableDebugMode();
 
-      final atom1 = Atom<int>(1, id: 'test1');
-      final atom2 = Atom<String>('test', id: 'test2');
+      Atom<int>(1, id: 'test1');
+      Atom<String>('test', id: 'test2');
 
       final allAtoms = AtomDebugger.getAllAtoms();
       expect(allAtoms, hasLength(2));
@@ -69,7 +69,7 @@ void main() {
       enableDebugMode();
 
       final longString = 'a' * 150;
-      final atom = Atom<String>(longString, id: 'long');
+      Atom<String>(longString, id: 'long');
 
       // Should not throw even with very long values
       expect(() => AtomDebugger.printAtomInfo(), returnsNormally);

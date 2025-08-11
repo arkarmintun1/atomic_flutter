@@ -114,7 +114,7 @@ extension AtomExtensions<T> on Atom<T> {
         }
       } catch (e) {
         if (Atom.debugMode) {
-          print('AtomicFlutter: Throttle error in atom ${id}: $e');
+          print('AtomicFlutter: Throttle error in atom $id: $e');
         }
       }
     });
@@ -135,7 +135,7 @@ extension AtomExtensions<T> on Atom<T> {
       } catch (e) {
         // Handle mapping errors gracefully
         if (Atom.debugMode) {
-          print('AtomicFlutter: Mapping error in atom ${id}: $e');
+          print('AtomicFlutter: Mapping error in atom $id: $e');
         }
       }
     });
@@ -156,7 +156,7 @@ extension AtomExtensions<T> on Atom<T> {
         }
       } catch (e) {
         if (Atom.debugMode) {
-          print('AtomicFlutter: Filter predicate error in atom ${id}: $e');
+          print('AtomicFlutter: Filter predicate error in atom $id: $e');
         }
       }
     });

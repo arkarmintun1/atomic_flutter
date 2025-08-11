@@ -639,7 +639,7 @@ class CartTab extends StatelessWidget {
 }
 
 class _EmptyCart extends StatelessWidget {
-  const _EmptyCart({Key? key}) : super(key: key);
+  const _EmptyCart();
 
   @override
   Widget build(BuildContext context) {
@@ -1343,9 +1343,8 @@ class _ProfileView extends StatelessWidget {
   final User user;
 
   const _ProfileView({
-    Key? key,
     required this.user,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

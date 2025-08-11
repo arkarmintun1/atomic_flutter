@@ -114,7 +114,7 @@ class AsyncValue<T> {
       case AsyncState.loading:
         return loading?.call() ?? orElse();
       case AsyncState.success:
-        return success?.call(data!) ?? orElse();
+        return success?.call(data as T) ?? orElse();
       case AsyncState.error:
         return error?.call(this.error!, stackTrace!) ?? orElse();
     }

@@ -273,17 +273,12 @@ class _ComputedAtom<T> extends Atom<T> {
   final T Function() _computeFunction;
 
   _ComputedAtom(
-    T initialValue,
+    super.initialValue,
     this._computeFunction, {
-    String? id,
-    bool autoDispose = true,
-    Duration? disposeTimeout,
-  }) : super(
-          initialValue,
-          id: id,
-          autoDispose: autoDispose,
-          disposeTimeout: disposeTimeout,
-        );
+    super.id,
+    super.autoDispose,
+    super.disposeTimeout,
+  });
 
   void _computeValue() {
     final newValue = _computeFunction();

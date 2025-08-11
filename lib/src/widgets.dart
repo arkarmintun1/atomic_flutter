@@ -16,10 +16,10 @@ class AtomBuilder<T> extends StatefulWidget {
   /// [atom]: The atom to subscribe to
   /// [builder]: Builder function that receives the current value
   const AtomBuilder({
-    Key? key,
+    super.key,
     required this.atom,
     required this.builder,
-  }) : super(key: key);
+  });
 
   @override
   State<AtomBuilder<T>> createState() => _AtomBuilderState<T>();
@@ -80,10 +80,10 @@ class MultiAtomBuilder extends StatefulWidget {
   /// [atoms]: The list of atoms to subscribe to
   /// [builder]: Builder function for creating the widget
   const MultiAtomBuilder({
-    Key? key,
+    super.key,
     required this.atoms,
     required this.builder,
-  }) : super(key: key);
+  });
 
   @override
   State<MultiAtomBuilder> createState() => _MultiAtomBuilderState();
@@ -167,11 +167,11 @@ class AtomSelector<T, S> extends StatefulWidget {
   /// [selector]: Function that selects a part of the atom's value
   /// [builder]: Builder function that receives the selected value
   const AtomSelector({
-    Key? key,
+    super.key,
     required this.atom,
     required this.selector,
     required this.builder,
-  }) : super(key: key);
+  });
 
   @override
   State<AtomSelector<T, S>> createState() => _AtomSelectorState<T, S>();
@@ -230,11 +230,11 @@ class AtomConsumer<T> extends StatelessWidget {
   final Widget? child;
 
   const AtomConsumer({
-    Key? key,
+    super.key,
     required this.atom,
     required this.builder,
     this.child,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {

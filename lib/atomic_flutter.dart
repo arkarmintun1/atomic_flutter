@@ -3,7 +3,7 @@
 ///
 /// It provides a simple way to create, manage, and react to state changes
 /// with minimal boilerplate and maximum type safety.
-library atomic_flutter;
+library;
 
 // Core atom implementation
 export 'src/core.dart';
