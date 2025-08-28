@@ -7,12 +7,16 @@ import 'package:flutter/widgets.dart';
 extension AtomExtensions<T> on Atom<T> {
   /// Execute a side effect when the atom changes
   ///
-  /// The effect is executed immediately with the current value,
+  /// The effect is executed immediately with the current value
+  /// when [runImmediately] is true,
   /// and then again whenever the value changes.
   ///
   /// Returns a function that can be called to stop the effect.
-  VoidCallback effect(void Function(T value) effect) {
-    effect(value); // Run immediately with current value
+  VoidCallback effect(void Function(T value) effect,
+      {bool runImmediately = false}) {
+    if (runImmediately) {
+      effect(value); // Run immediately if specified
+    }
     addListener(effect); // Run on future changes
 
     return () => removeListener(effect);
