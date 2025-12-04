@@ -329,4 +329,237 @@ void main() {
       expect(disposed, true);
     });
   });
+
+  group('Async Extension Memory Leak Tests', () {
+    test('debounceAsync should cleanup when derived atom is disposed', () {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.debounceAsync(Duration(milliseconds: 100));
+
+      // Source should have a listener from derived
+      expect(source.refCount, 1);
+
+      derived.dispose();
+
+      // Listener should be removed
+      expect(source.refCount, 0);
+
+      source.dispose();
+    });
+
+    test('debounceAsync should cleanup when source atom is disposed', () {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.debounceAsync(Duration(milliseconds: 100));
+
+      bool derivedDisposed = false;
+      derived.onDispose(() => derivedDisposed = true);
+
+      source.dispose();
+
+      // Derived should be disposed when source is disposed
+      expect(derivedDisposed, true);
+    });
+
+    test('mapAsync should cleanup when derived atom is disposed', () {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.mapAsync((value) => value.toString());
+
+      expect(source.refCount, 1);
+
+      derived.dispose();
+      expect(source.refCount, 0);
+
+      source.dispose();
+    });
+
+    test('mapAsync should cleanup when source atom is disposed', () {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.mapAsync((value) => value.toString());
+
+      bool derivedDisposed = false;
+      derived.onDispose(() => derivedDisposed = true);
+
+      source.dispose();
+      expect(derivedDisposed, true);
+    });
+
+    test('chain should cleanup when derived atom is disposed', () async {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.chain((value) async => value.toString());
+
+      expect(source.refCount, 1);
+
+      derived.dispose();
+      expect(source.refCount, 0);
+
+      source.dispose();
+    });
+
+    test('chain should cleanup when source atom is disposed', () async {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.chain((value) async => value.toString());
+
+      bool derivedDisposed = false;
+      derived.onDispose(() => derivedDisposed = true);
+
+      source.dispose();
+      expect(derivedDisposed, true);
+    });
+
+    test('cached should cleanup when derived atom is disposed', () {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.cached(ttl: Duration(seconds: 5));
+
+      expect(source.refCount, 1);
+
+      derived.dispose();
+      expect(source.refCount, 0);
+
+      source.dispose();
+    });
+
+    test('cached should cleanup when source atom is disposed', () {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.cached(ttl: Duration(seconds: 5));
+
+      bool derivedDisposed = false;
+      derived.onDispose(() => derivedDisposed = true);
+
+      source.dispose();
+      expect(derivedDisposed, true);
+    });
+
+    test('asyncMap should cleanup when derived atom is disposed', () async {
+      final source = Atom<int>(1, autoDispose: false);
+      final derived = source.asyncMap((value) async => value.toString());
+
+      expect(source.refCount, greaterThan(0));
+
+      derived.dispose();
+
+      // Wait for async operation to complete
+      await Future.delayed(Duration(milliseconds: 10));
+
+      expect(source.refCount, 0);
+      source.dispose();
+    });
+
+    test('asyncMap should cleanup when source atom is disposed', () async {
+      final source = Atom<int>(1, autoDispose: false);
+      final derived = source.asyncMap((value) async => value.toString());
+
+      bool derivedDisposed = false;
+      derived.onDispose(() => derivedDisposed = true);
+
+      // Wait for initial async operation
+      await Future.delayed(Duration(milliseconds: 10));
+
+      source.dispose();
+      expect(derivedDisposed, true);
+    });
+
+    test('multiple chained extensions should cleanup properly', () async {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final debounced = source.debounceAsync(Duration(milliseconds: 50));
+      final mapped = debounced.mapAsync((value) => value.toString());
+      final cached = mapped.cached(ttl: Duration(seconds: 1));
+
+      expect(source.refCount, 1);
+      expect(debounced.refCount, 1);
+      expect(mapped.refCount, 1);
+
+      // Dispose in reverse order
+      cached.dispose();
+      expect(mapped.refCount, 0);
+
+      mapped.dispose();
+      expect(debounced.refCount, 0);
+
+      debounced.dispose();
+      expect(source.refCount, 0);
+
+      source.dispose();
+    });
+
+    test('should not leak timers in debounceAsync', () async {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.debounceAsync(Duration(milliseconds: 100));
+
+      // Trigger several updates
+      source.setData(1);
+      source.setData(2);
+      source.setData(3);
+
+      // Dispose before debounce completes
+      derived.dispose();
+
+      // Wait to ensure timer doesn't fire
+      await Future.delayed(Duration(milliseconds: 150));
+
+      // Should not throw
+      source.dispose();
+    });
+
+    test('should not leak timers in cached', () async {
+      final source = AsyncAtom<int>(autoDispose: false);
+      final derived = source.cached(ttl: Duration(milliseconds: 100));
+
+      source.setData(42);
+
+      // Dispose before TTL expires
+      derived.dispose();
+
+      // Wait for TTL
+      await Future.delayed(Duration(milliseconds: 150));
+
+      // Should not throw
+      source.dispose();
+    });
+
+    test('computedAsync should cleanup listeners on dispose', () async {
+      final a = Atom<int>(1, autoDispose: false);
+      final b = Atom<int>(2, autoDispose: false);
+
+      final computed = computedAsync(
+        () async => a.value + b.value,
+        tracked: [a, b],
+        debounce: Duration(milliseconds: 100),
+      );
+
+      expect(a.refCount, 1);
+      expect(b.refCount, 1);
+
+      computed.dispose();
+
+      // Wait for any pending operations
+      await Future.delayed(Duration(milliseconds: 150));
+
+      expect(a.refCount, 0);
+      expect(b.refCount, 0);
+
+      a.dispose();
+      b.dispose();
+    });
+
+    test('combineAsync should cleanup listeners on dispose', () {
+      final atom1 = AsyncAtom<int>(autoDispose: false);
+      final atom2 = AsyncAtom<int>(autoDispose: false);
+      final atom3 = AsyncAtom<int>(autoDispose: false);
+
+      final combined = combineAsync([atom1, atom2, atom3]);
+
+      expect(atom1.refCount, 1);
+      expect(atom2.refCount, 1);
+      expect(atom3.refCount, 1);
+
+      combined.dispose();
+
+      expect(atom1.refCount, 0);
+      expect(atom2.refCount, 0);
+      expect(atom3.refCount, 0);
+
+      atom1.dispose();
+      atom2.dispose();
+      atom3.dispose();
+    });
+  });
 }

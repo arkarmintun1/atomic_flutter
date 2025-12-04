@@ -106,16 +106,33 @@ class Atom<T> {
       return false;
     });
 
-    // Notify active dependents
+    // Notify active dependents with error handling
     for (final dependent in activeDependents) {
       if (dependent is _ComputedAtom) {
-        dependent._computeValue();
+        try {
+          dependent._computeValue();
+        } catch (e, stackTrace) {
+          if (debugMode) {
+            print(
+              'AtomicFlutter: Error in computed atom "${dependent.id}" '
+              'while recomputing from dependency "$_id": $e\n$stackTrace',
+            );
+          }
+        }
       }
     }
 
-    // Then notify UI listeners
+    // Then notify UI listeners with error handling
     for (final listener in _listeners) {
-      listener._notify(_value);
+      try {
+        listener._notify(_value);
+      } catch (e, stackTrace) {
+        if (debugMode) {
+          print(
+            'AtomicFlutter: Error in listener for atom "$_id": $e\n$stackTrace',
+          );
+        }
+      }
     }
   }
 
@@ -283,8 +300,24 @@ class _ComputedAtom<T> extends Atom<T> {
   void _computeValue() {
     final newValue = _computeFunction();
     if (newValue != value) {
-      set(newValue);
+      super.set(newValue); // Use super.set to bypass override
     }
+  }
+
+  @override
+  void set(T newValue) {
+    throw UnsupportedError(
+      'Cannot directly set value of computed atom "$id". '
+      'Update its dependencies instead.',
+    );
+  }
+
+  @override
+  void update(T Function(T current) updater) {
+    throw UnsupportedError(
+      'Cannot directly update value of computed atom "$id". '
+      'Update its dependencies instead.',
+    );
   }
 }
 
@@ -295,6 +328,8 @@ class _ComputedAtom<T> extends Atom<T> {
 /// [id]: Optional identifier for debugging
 /// [autoDispose]: Whether this atom should be auto-disposed when no longer used
 /// [disposeTimeout]: How long to wait before disposing unused computed atoms
+///
+/// Throws [StateError] if circular dependencies are detected.
 Atom<R> computed<R>(
   R Function() compute, {
   List<Atom> tracked = const [],
@@ -310,6 +345,16 @@ Atom<R> computed<R>(
     disposeTimeout: disposeTimeout,
   );
 
+  // Check for circular dependencies before establishing connections
+  for (final atom in tracked) {
+    if (_hasCircularDependency(atom, derivedAtom)) {
+      throw StateError(
+        'Circular dependency detected: Atom "${derivedAtom.id}" cannot depend on '
+        '"${atom.id}" because it would create a cycle in the dependency graph.',
+      );
+    }
+  }
+
   for (final atom in tracked) {
     // Store weak references to dependencies
     derivedAtom._dependencies.add(WeakReference(atom));
@@ -319,6 +364,42 @@ Atom<R> computed<R>(
   }
 
   return derivedAtom;
+}
+
+/// Check if adding a dependency would create a circular dependency
+///
+/// This performs a depth-first search through the dependency graph
+/// to detect cycles.
+bool _hasCircularDependency(Atom dependency, Atom dependent) {
+  // Check if the dependency already depends on the dependent (directly or indirectly)
+  return _dependsOn(dependency, dependent, <Atom>{});
+}
+
+/// Recursively check if 'source' depends on 'target'
+bool _dependsOn(Atom source, Atom target, Set<Atom> visited) {
+  // Prevent infinite loops in case of existing cycles
+  if (visited.contains(source)) {
+    return false;
+  }
+  visited.add(source);
+
+  // Get all dependencies of the source atom
+  for (final weakRef in source._dependencies) {
+    final dep = weakRef.target;
+    if (dep == null) continue;
+
+    // Direct dependency match
+    if (dep == target) {
+      return true;
+    }
+
+    // Check transitive dependencies
+    if (_dependsOn(dep, target, visited)) {
+      return true;
+    }
+  }
+
+  return false;
 }
 
 /// Atom family for creating related atoms with different keys

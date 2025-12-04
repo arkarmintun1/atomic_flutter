@@ -45,13 +45,21 @@ extension AtomExtensions<T> on Atom<T> {
 
     addListener(listener);
 
-    // Close controller when stream is done
+    // Close controller when stream is cancelled
     controller.onCancel = () {
       removeListener(listener);
       if (!controller.isClosed) {
         controller.close();
       }
     };
+
+    // Also close controller when atom is disposed
+    onDispose(() {
+      removeListener(listener);
+      if (!controller.isClosed) {
+        controller.close();
+      }
+    });
 
     return controller.stream;
   }
@@ -84,16 +92,25 @@ extension AtomExtensions<T> on Atom<T> {
     final debouncedAtom = Atom<T>(value, autoDispose: true);
     Timer? debounceTimer;
 
-    addListener((newValue) {
+    void listener(T newValue) {
       debounceTimer?.cancel();
       debounceTimer = Timer(duration, () {
         debouncedAtom.set(newValue);
       });
-    });
+    }
 
-    // Clean up when disposed
+    addListener(listener);
+
+    // Cleanup when derived atom is disposed
     debouncedAtom.onDispose(() {
       debounceTimer?.cancel();
+      removeListener(listener);
+    });
+
+    // Cleanup derived atom when source atom is disposed
+    onDispose(() {
+      debounceTimer?.cancel();
+      debouncedAtom.dispose();
     });
 
     return debouncedAtom;
@@ -109,7 +126,7 @@ extension AtomExtensions<T> on Atom<T> {
     final throttledAtom = Atom<T>(value, autoDispose: true);
     DateTime? lastUpdate;
 
-    addListener((newValue) {
+    void listener(T newValue) {
       try {
         final now = DateTime.now();
         if (lastUpdate == null || now.difference(lastUpdate!) >= duration) {
@@ -121,6 +138,18 @@ extension AtomExtensions<T> on Atom<T> {
           print('AtomicFlutter: Throttle error in atom $id: $e');
         }
       }
+    }
+
+    addListener(listener);
+
+    // Cleanup when derived atom is disposed
+    throttledAtom.onDispose(() {
+      removeListener(listener);
+    });
+
+    // Cleanup derived atom when source atom is disposed
+    onDispose(() {
+      throttledAtom.dispose();
     });
 
     return throttledAtom;
@@ -133,7 +162,7 @@ extension AtomExtensions<T> on Atom<T> {
   Atom<R> map<R>(R Function(T value) mapper) {
     final mappedAtom = Atom<R>(mapper(value), autoDispose: true);
 
-    addListener((newValue) {
+    void listener(T newValue) {
       try {
         mappedAtom.set(mapper(newValue));
       } catch (e) {
@@ -142,6 +171,18 @@ extension AtomExtensions<T> on Atom<T> {
           print('AtomicFlutter: Mapping error in atom $id: $e');
         }
       }
+    }
+
+    addListener(listener);
+
+    // Cleanup when derived atom is disposed
+    mappedAtom.onDispose(() {
+      removeListener(listener);
+    });
+
+    // Cleanup derived atom when source atom is disposed
+    onDispose(() {
+      mappedAtom.dispose();
     });
 
     return mappedAtom;
@@ -153,7 +194,7 @@ extension AtomExtensions<T> on Atom<T> {
   Atom<T> where(bool Function(T value) predicate) {
     final filteredAtom = Atom<T>(value, autoDispose: true);
 
-    addListener((newValue) {
+    void listener(T newValue) {
       try {
         if (predicate(newValue)) {
           filteredAtom.set(newValue);
@@ -163,6 +204,18 @@ extension AtomExtensions<T> on Atom<T> {
           print('AtomicFlutter: Filter predicate error in atom $id: $e');
         }
       }
+    }
+
+    addListener(listener);
+
+    // Cleanup when derived atom is disposed
+    filteredAtom.onDispose(() {
+      removeListener(listener);
+    });
+
+    // Cleanup derived atom when source atom is disposed
+    onDispose(() {
+      filteredAtom.dispose();
     });
 
     return filteredAtom;
@@ -175,11 +228,35 @@ extension AtomExtensions<T> on Atom<T> {
     final combinedAtom = Atom<(T, R)>((value, other.value), autoDispose: true);
 
     void updateCombined() {
-      combinedAtom.set((value, other.value));
+      try {
+        combinedAtom.set((value, other.value));
+      } catch (e) {
+        if (Atom.debugMode) {
+          print('AtomicFlutter: Combine error in atom $id: $e');
+        }
+      }
     }
 
-    addListener((_) => updateCombined());
-    other.addListener((_) => updateCombined());
+    void thisListener(T _) => updateCombined();
+    void otherListener(R _) => updateCombined();
+
+    addListener(thisListener);
+    other.addListener(otherListener);
+
+    // Cleanup when combined atom is disposed
+    combinedAtom.onDispose(() {
+      removeListener(thisListener);
+      other.removeListener(otherListener);
+    });
+
+    // Cleanup combined atom when either source atom is disposed
+    onDispose(() {
+      combinedAtom.dispose();
+    });
+
+    other.onDispose(() {
+      combinedAtom.dispose();
+    });
 
     return combinedAtom;
   }

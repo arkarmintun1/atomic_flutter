@@ -4,6 +4,48 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2025-12-04
+
+### Fixed
+
+**Critical Memory Leak Fixes:**
+- Fixed memory leaks in all core extension methods (`debounce`, `throttle`, `map`, `where`, `combine`)
+- Fixed memory leaks in all async extension methods (`debounceAsync`, `mapAsync`, `chain`, `cached`, `asyncMap`)
+- Fixed `StreamController` not being disposed when atom is disposed in `asStream()`
+- All extension methods now properly cleanup listeners in both directions (source → derived and derived → source)
+- Timer cleanup added to prevent resource leaks in debounce, throttle, and cached operations
+
+**Type Safety & Error Prevention:**
+- Computed atoms now throw `UnsupportedError` when attempting to mutate via `set()` or `update()`
+- Added circular dependency detection in `computed()` with clear error messages
+- Prevents infinite loops from circular atom dependencies
+
+**Robustness & Error Handling:**
+- Listener errors are now caught and logged instead of crashing the app
+- Errors in computed atom recomputation no longer prevent other listeners from executing
+- Added try-catch blocks to all extension methods with error logging in debug mode
+
+**Edge Cases & API Improvements:**
+- `combineAsync()` now handles empty list input (returns success with empty list)
+- `chain()` now propagates initial state correctly (idle/loading/error states)
+- `combine()` now includes error handling for tuple creation
+
+### Added
+
+- Comprehensive test suite with 31+ new test cases covering:
+  - Memory leak detection and prevention
+  - Computed atom mutation attempts
+  - Circular dependency detection
+  - Error handling in listeners and computed atoms
+  - Edge cases in async operations
+  - Bidirectional cleanup verification
+
+### Changed
+
+- All extension methods now use named listener functions for proper cleanup
+- Improved documentation for `combineAsync()` explaining behavior with empty lists
+- Enhanced error messages for computed atom mutations
+
 ## [0.2.4] - 2025-08-29
 
 ### Changed

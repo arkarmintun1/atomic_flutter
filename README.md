@@ -71,7 +71,7 @@ Add AtomicFlutter to your `pubspec.yaml`:
 
 ```yaml
 dependencies:
-  atomic_flutter: ^0.2.4
+  atomic_flutter: ^0.3.0
 ```
 
 Then import it in your Dart files:

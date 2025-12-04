@@ -15,15 +15,25 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
 
     Timer? debounceTimer;
 
-    addListener((asyncValue) {
+    void listener(AsyncValue<T> asyncValue) {
       debounceTimer?.cancel();
       debounceTimer = Timer(duration, () {
         debouncedAtom.set(asyncValue);
       });
-    });
+    }
 
+    addListener(listener);
+
+    // Cleanup when derived atom is disposed
     debouncedAtom.onDispose(() {
       debounceTimer?.cancel();
+      removeListener(listener);
+    });
+
+    // Cleanup derived atom when source atom is disposed
+    onDispose(() {
+      debounceTimer?.cancel();
+      debouncedAtom.dispose();
     });
 
     return debouncedAtom;
@@ -33,8 +43,20 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
   AsyncAtom<R> mapAsync<R>(R Function(T data) mapper) {
     final mappedAtom = AsyncAtom<R>(autoDispose: true);
 
-    addListener((asyncValue) {
+    void listener(AsyncValue<T> asyncValue) {
       mappedAtom.set(asyncValue.map(mapper));
+    }
+
+    addListener(listener);
+
+    // Cleanup when derived atom is disposed
+    mappedAtom.onDispose(() {
+      removeListener(listener);
+    });
+
+    // Cleanup derived atom when source atom is disposed
+    onDispose(() {
+      mappedAtom.dispose();
     });
 
     return mappedAtom;
@@ -73,15 +95,31 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
   AsyncAtom<R> chain<R>(Future<R> Function(T data) nextOperation) {
     final chainedAtom = AsyncAtom<R>(autoDispose: true);
 
-    addListener((asyncValue) {
+    void listener(AsyncValue<T> asyncValue) {
       if (asyncValue.hasValue) {
         chainedAtom.execute(() => nextOperation(asyncValue.value));
       } else if (asyncValue.hasError) {
         chainedAtom.setError(asyncValue.error!, asyncValue.stackTrace!);
       } else if (asyncValue.isLoading) {
-        // Fix: Remove type parameter
         chainedAtom.set(const AsyncValue.loading());
+      } else if (asyncValue.isIdle) {
+        chainedAtom.set(const AsyncValue.idle());
       }
+    }
+
+    addListener(listener);
+
+    // Propagate initial state
+    listener(value);
+
+    // Cleanup when derived atom is disposed
+    chainedAtom.onDispose(() {
+      removeListener(listener);
+    });
+
+    // Cleanup derived atom when source atom is disposed
+    onDispose(() {
+      chainedAtom.dispose();
     });
 
     return chainedAtom;
@@ -95,7 +133,7 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
     final cachedAtom = AsyncAtom<T>(initialValue: value, autoDispose: true);
     Timer? ttlTimer;
 
-    addListener((asyncValue) {
+    void listener(AsyncValue<T> asyncValue) {
       if (asyncValue.hasValue) {
         cachedAtom.set(asyncValue);
 
@@ -113,10 +151,20 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
       } else if (asyncValue.isLoading && !cachedAtom.value.hasValue) {
         cachedAtom.set(asyncValue);
       }
-    });
+    }
 
+    addListener(listener);
+
+    // Cleanup when derived atom is disposed
     cachedAtom.onDispose(() {
       ttlTimer?.cancel();
+      removeListener(listener);
+    });
+
+    // Cleanup derived atom when source atom is disposed
+    onDispose(() {
+      ttlTimer?.cancel();
+      cachedAtom.dispose();
     });
 
     return cachedAtom;
@@ -145,8 +193,20 @@ extension AtomAsyncExtensions<T> on Atom<T> {
     asyncAtom.execute(() => operation(value));
 
     // Execute when atom changes
-    addListener((newValue) {
+    void listener(T newValue) {
       asyncAtom.execute(() => operation(newValue));
+    }
+
+    addListener(listener);
+
+    // Cleanup when derived atom is disposed
+    asyncAtom.onDispose(() {
+      removeListener(listener);
+    });
+
+    // Cleanup derived atom when source atom is disposed
+    onDispose(() {
+      asyncAtom.dispose();
     });
 
     return asyncAtom;
@@ -200,8 +260,21 @@ AsyncAtom<R> computedAsync<R>(
 }
 
 /// Create an async atom that combines multiple async atoms
+///
+/// Returns an [AsyncAtom] that combines the values of all provided atoms.
+/// The combined atom will be in:
+/// - `loading` state if ANY atom is loading
+/// - `error` state if ANY atom has an error
+/// - `success` state with an empty list if the input list is empty
+/// - `success` state with all values when ALL atoms have successfully loaded
 AsyncAtom<List<T>> combineAsync<T>(List<AsyncAtom<T>> atoms) {
   final combinedAtom = AsyncAtom<List<T>>(autoDispose: true);
+
+  // Handle empty list case
+  if (atoms.isEmpty) {
+    combinedAtom.setData([]);
+    return combinedAtom;
+  }
 
   void updateCombined() {
     final values = <T>[];
@@ -227,7 +300,6 @@ AsyncAtom<List<T>> combineAsync<T>(List<AsyncAtom<T>> atoms) {
     if (hasError) {
       combinedAtom.setError(firstError!, firstStackTrace!);
     } else if (isLoading) {
-      // Fix: Use const constructor without type parameters
       combinedAtom.set(const AsyncValue.loading());
     } else if (values.length == atoms.length) {
       combinedAtom.setData(values);
