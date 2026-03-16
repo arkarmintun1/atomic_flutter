@@ -8,7 +8,33 @@ on:
 jobs:
   publish:
     permissions:
-      id-token: write # Required for authentication using OIDC
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
-    with:
-      environment: 'pub.dev'
+      id-token: write # Required for OIDC
+      contents: read  # Required for checkout
+    runs-on: ubuntu-latest
+    environment: 'pub.dev'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+
+      - name: Install extension dependencies
+        working-directory: devtools_extension
+        run: flutter pub get
+
+      - name: Build DevTools extension
+        working-directory: devtools_extension
+        run: |
+          dart run devtools_extensions build_and_copy --source=. --dest=../extension/devtools
+
+      - name: Install package dependencies
+        run: flutter pub get
+
+      - name: Setup Dart
+        uses: dart-lang/setup-dart@v1
+
+      - name: Publish to pub.dev
+        run: dart pub publish --force

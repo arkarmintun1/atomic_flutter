@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:atomic_flutter/src/debug.dart';
 import 'package:flutter/widgets.dart';
 
@@ -40,7 +41,6 @@ class Atom<T> {
         _autoDispose = autoDispose,
         _disposeTimeout = disposeTimeout {
     if (debugMode) {
-      print('AtomicFlutter: Created atom $_id with initial value: $_value');
       AtomDebugger.register(this);
     }
   }
@@ -63,6 +63,38 @@ class Atom<T> {
   /// Whether this atom has any listeners
   bool get hasListeners => _listeners.isNotEmpty;
 
+  /// Debug-only: IDs of atoms this atom depends on.
+  ///
+  /// Returns an empty list if debug mode is off or no dependencies exist.
+  /// Used by the DevTools extension to build the dependency graph.
+  List<String> get debugDependencyIds {
+    if (!debugMode) return const [];
+    return _dependencies
+        .map((ref) => ref.target?.id)
+        .whereType<String>()
+        .toList();
+  }
+
+  /// Debug-only: IDs of atoms that depend on this atom.
+  ///
+  /// Returns an empty list if debug mode is off or no dependents exist.
+  /// Used by the DevTools extension to build the dependency graph.
+  List<String> get debugDependentIds {
+    if (!debugMode) return const [];
+    return _dependents
+        .map((ref) => ref.target?.id)
+        .whereType<String>()
+        .toList();
+  }
+
+  /// Debug-only: Whether this atom is a computed atom.
+  ///
+  /// Used by the DevTools extension to determine node type in the graph.
+  bool get isComputed => this is _ComputedAtom;
+
+  /// Debug-only: Number of listeners attached to this atom.
+  int get listenerCount => _listeners.length;
+
   /// Update the atom value with explicit mutation
   ///
   /// This will notify all listeners if the value actually changes.
@@ -70,11 +102,9 @@ class Atom<T> {
   void set(T newValue) {
     if (identical(_value, newValue) && _value == newValue) return;
 
-    final oldValue = _value;
     _value = newValue;
 
     if (debugMode) {
-      print('AtomicFlutter: Updated atom $_id: $oldValue -> $newValue');
       AtomPerformanceMonitor.recordUpdate(_id);
     }
 
@@ -191,19 +221,11 @@ class Atom<T> {
     // Cancel any pending dispose timer
     _disposeTimer?.cancel();
     _disposeTimer = null;
-
-    if (debugMode) {
-      print('AtomicFlutter: Incremented ref count for atom $_id: $_refCount');
-    }
   }
 
   /// Decrement the reference counter and potentially schedule disposal
   void _decrementRefCount() {
     _refCount--;
-
-    if (debugMode) {
-      print('AtomicFlutter: Decremented ref count for atom $_id: $_refCount');
-    }
 
     // If auto-dispose is enabled and no more references, schedule disposal
     if (_autoDispose && _refCount <= 0 && _listeners.isEmpty) {
@@ -218,11 +240,6 @@ class Atom<T> {
 
     // Set new timer for disposal
     final timeout = _disposeTimeout ?? defaultDisposeTimeout;
-
-    if (debugMode) {
-      print(
-          'AtomicFlutter: Scheduling dispose for atom $_id in ${timeout.inSeconds} seconds');
-    }
 
     _disposeTimer = Timer(timeout, () {
       // Double-check that it's still unused before disposing

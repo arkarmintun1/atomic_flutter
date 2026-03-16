@@ -1,5 +1,58 @@
 import 'dart:async';
+
 import 'core.dart';
+
+/// A recorded state transition event for an AsyncAtom.
+/// Only recorded when debug mode is enabled.
+class AsyncAtomEvent {
+  final String atomId;
+  final DateTime timestamp;
+  final String fromState;
+  final String toState;
+  final int durationMs;
+  final String? error;
+
+  const AsyncAtomEvent({
+    required this.atomId,
+    required this.timestamp,
+    required this.fromState,
+    required this.toState,
+    required this.durationMs,
+    this.error,
+  });
+
+  Map<String, dynamic> toJson() => {
+        'atomId': atomId,
+        'timestamp': timestamp.toIso8601String(),
+        'fromState': fromState,
+        'toState': toState,
+        'durationMs': durationMs,
+        'error': error,
+      };
+}
+
+/// Global ring buffer for async events. Debug mode only.
+class AsyncEventLog {
+  static final List<AsyncAtomEvent> _events = [];
+  static const int _maxEvents = 500;
+
+  static void record(AsyncAtomEvent event) {
+    if (!Atom.debugMode) return;
+    _events.add(event);
+    if (_events.length > _maxEvents) {
+      _events.removeAt(0);
+    }
+  }
+
+  static List<AsyncAtomEvent> getEvents({String? atomId}) {
+    if (atomId != null) {
+      return _events.where((e) => e.atomId == atomId).toList();
+    }
+    return List.unmodifiable(_events);
+  }
+
+  static void clear() => _events.clear();
+}
 
 /// Represents the state of an async operation
 enum AsyncState { idle, loading, success, error }
@@ -140,6 +193,7 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
   int _operationId = 0;
   Future<T> Function()? _lastOperation;
   AsyncValue<T>? _stateBeforeLoading; // Store state before loading
+  DateTime? _loadingStartTime;
 
   AsyncAtom({
     AsyncValue<T>? initialValue,
@@ -161,28 +215,55 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
     // Store current state before setting loading
     _stateBeforeLoading = value;
 
-    // Increment operation ID to cancel previous operations
     final currentOperationId = ++_operationId;
+    final fromState = value.state.name;
 
-    // Set loading state
+    // Record loading start time
+    _loadingStartTime = DateTime.now();
+
     final previousData = keepPreviousData ? value.data : null;
     set(AsyncValue.loading(data: previousData));
+
+    AsyncEventLog.record(AsyncAtomEvent(
+      atomId: id,
+      timestamp: _loadingStartTime!,
+      fromState: fromState,
+      toState: 'loading',
+      durationMs: 0,
+    ));
 
     try {
       final result = await operation();
 
-      // Only update state if this is still the current operation
       if (_operationId == currentOperationId) {
+        final duration = DateTime.now().difference(_loadingStartTime!);
         set(AsyncValue.success(result));
-        _stateBeforeLoading = null; // Clear stored state
+        _stateBeforeLoading = null;
+
+        AsyncEventLog.record(AsyncAtomEvent(
+          atomId: id,
+          timestamp: DateTime.now(),
+          fromState: 'loading',
+          toState: 'success',
+          durationMs: duration.inMilliseconds,
+        ));
       }
 
       return result;
     } catch (error, stackTrace) {
-      // Only update state if this is still the current operation
       if (_operationId == currentOperationId) {
+        final duration = DateTime.now().difference(_loadingStartTime!);
         set(AsyncValue.error(error, stackTrace, data: previousData));
-        _stateBeforeLoading = null; // Clear stored state
+        _stateBeforeLoading = null;
+
+        AsyncEventLog.record(AsyncAtomEvent(
+          atomId: id,
+          timestamp: DateTime.now(),
+          fromState: 'loading',
+          toState: 'error',
+          durationMs: duration.inMilliseconds,
+          error: error.toString(),
+        ));
       }
 
       rethrow;

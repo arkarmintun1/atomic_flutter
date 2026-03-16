@@ -1,0 +1,5 @@
+name: atomic_flutter
+issueTracker: https://github.com/arkarmintun1/atomic_flutter/issues
+version: 0.4.0
+materialIconCodePoint: '0xe87d'
+requiresRunningApplication: true

@@ -1,0 +1,17 @@
+# .pubignore
+# Exclude source code for the extension as it's not needed for the package.
+devtools_extension/
+
+# Standard Dart/Flutter ignores (rooted to avoid sub-folder matches)
+/.dart_tool/
+/.fvm/
+/.packages
+/.flutter-plugins
+/.flutter-plugins-dependencies
+/.metadata
+/build/
+/example/build/
+
+# Do NOT ignore extension/devtools/build/
+# This is where the compiled extension lives and must be included.
+!extension/devtools/build/

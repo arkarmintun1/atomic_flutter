@@ -1,11 +1,14 @@
 import 'core.dart';
+import 'devtools_service.dart';
 
 /// Enable debug mode to see atom operations in console
 ///
-/// When debug mode is enabled, AtomicFlutter will print information
-/// about atom creation, updates, and disposal to the console.
+/// When debug mode is enabled, AtomicFlutter will:
+/// - Print information about atom creation, updates, and disposal to the console
+/// - Register VM service extensions for the DevTools extension
 void enableDebugMode() {
   Atom.debugMode = true;
+  AtomicFlutterDevToolsService.ensureRegistered();
 }
 
 /// Disable debug mode
@@ -175,5 +178,35 @@ class AtomMemoryTracker {
     print('Tracked atoms: ${_trackedAtoms.length}');
     print('Active atoms: ${AtomDebugger.getAllAtoms().length}');
     print('==================================');
+  }
+}
+
+/// Tracks widget rebuild counts per atom for performance monitoring.
+/// Only active in debug mode.
+class WidgetRebuildTracker {
+  static final Map<String, int> _rebuildCounts = {};
+  static final Map<String, DateTime> _lastRebuildTime = {};
+
+  /// Record a widget rebuild for a given atom ID.
+  static void recordRebuild(String atomId) {
+    if (!Atom.debugMode) return;
+    _rebuildCounts[atomId] = (_rebuildCounts[atomId] ?? 0) + 1;
+    _lastRebuildTime[atomId] = DateTime.now();
+  }
+
+  /// Get rebuild counts for all atoms.
+  static Map<String, int> getAllRebuildCounts() {
+    return Map.unmodifiable(_rebuildCounts);
+  }
+
+  /// Get the last rebuild time for a specific atom.
+  static DateTime? getLastRebuildTime(String atomId) {
+    return _lastRebuildTime[atomId];
+  }
+
+  /// Reset all counters.
+  static void reset() {
+    _rebuildCounts.clear();
+    _lastRebuildTime.clear();
   }
 }

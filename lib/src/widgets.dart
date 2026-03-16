@@ -1,5 +1,5 @@
+import 'package:atomic_flutter/atomic_flutter.dart';
 import 'package:flutter/widgets.dart';
-import 'core.dart';
 
 /// Flutter widget that efficiently subscribes to atoms
 ///
@@ -61,6 +61,7 @@ class _AtomBuilderState<T> extends State<AtomBuilder<T>> {
 
   @override
   Widget build(BuildContext context) {
+    WidgetRebuildTracker.recordRebuild(widget.atom.id);
     return widget.builder(context, _value);
   }
 }

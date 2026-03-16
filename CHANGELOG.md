@@ -4,6 +4,32 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-03-17
+
+### Added
+
+- **DevTools Extension**: Built-in Flutter DevTools extension with four feature panels:
+  - **Atom Inspector**: Live table of all atoms with search, filtering, and detail view
+  - **Dependency Graph**: Interactive force-directed graph visualization of atom dependencies
+  - **Async Timeline**: Timeline of AsyncAtom state transitions with duration bars and error details
+  - **Performance Dashboard**: Update frequency and widget rebuild rankings with hot atom detection and memory leak warnings
+  - **Settings**: Configurable polling intervals and JSON snapshot export
+- `AtomicFlutterDevToolsService` — VM service extension layer for DevTools communication
+- `AsyncAtomEvent` and `AsyncEventLog` — ring buffer for async state transition recording
+- `WidgetRebuildTracker` — tracks AtomBuilder widget rebuild counts per atom
+- Debug getters on `Atom`: `debugDependencyIds`, `debugDependentIds`, `isComputed`, `listenerCount`
+- `enableDebugMode()` now automatically registers DevTools service extensions and enables performance monitoring
+
+### Changed
+
+- `enableDebugMode()` now also enables `AtomPerformanceMonitor` and registers DevTools service extensions
+
+### Notes
+
+- All DevTools instrumentation is zero-cost when debug mode is off
+- No new runtime dependencies — uses only `dart:developer` for service extensions
+- The extension is bundled with the package — no separate dependency needed
+
 ## [0.3.0] - 2025-12-04
 
 ### Fixed

@@ -5,23 +5,11 @@
 /// with minimal boilerplate and maximum type safety.
 library;
 
-// Core atom implementation
-export 'src/core.dart';
-
-// Async atom implementation
 export 'src/async_atom.dart';
-
-// Flutter widgets
-export 'src/widgets.dart';
-
-// Async widgets
-export 'src/async_widget.dart';
-
-// Utility functions
-export 'src/debug.dart';
-
-// Extensions
-export 'src/extensions.dart';
-
-// Async extensions
 export 'src/async_extensions.dart';
+export 'src/async_widget.dart';
+export 'src/core.dart';
+export 'src/debug.dart';
+export 'src/devtools_service.dart';
+export 'src/extensions.dart';
+export 'src/widgets.dart';
