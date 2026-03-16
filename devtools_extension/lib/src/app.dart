@@ -56,16 +56,6 @@ class _AtomicFlutterAppState extends State<AtomicFlutterApp> {
       height: 40,
       child: Row(
         children: [
-          const SizedBox(width: 8),
-          Icon(Icons.blur_circular, size: 18, color: theme.colorScheme.primary),
-          const SizedBox(width: 6),
-          Text(
-            'AtomicFlutter',
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(width: 16),
           for (int i = 0; i < _tabs.length; i++) ...[
             _TabButton(
               label: _tabs[i].label,
