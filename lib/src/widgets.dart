@@ -4,21 +4,39 @@ import 'package:flutter/widgets.dart';
 /// Flutter widget that efficiently subscribes to atoms
 ///
 /// Rebuilds only when the atom's value changes.
+///
+/// The optional [child] is passed through to [builder] but is built only once
+/// and does not rebuild when the atom changes — useful for expensive subtrees:
+///
+/// ```dart
+/// AtomBuilder(
+///   atom: counterAtom,
+///   child: const ExpensiveStaticWidget(),
+///   builder: (context, count, child) => Row(
+///     children: [Text('$count'), child!],
+///   ),
+/// )
+/// ```
 class AtomBuilder<T> extends StatefulWidget {
   /// The atom to subscribe to
   final Atom<T> atom;
 
-  /// Builder function that receives the current value
-  final Widget Function(BuildContext context, T value) builder;
+  /// Builder function that receives the current value and optional child
+  final Widget Function(BuildContext context, T value, Widget? child) builder;
+
+  /// Optional widget that is passed to [builder] without rebuilding
+  final Widget? child;
 
   /// Creates an AtomBuilder widget
   ///
   /// [atom]: The atom to subscribe to
-  /// [builder]: Builder function that receives the current value
+  /// [builder]: Builder function that receives the current value and optional child
+  /// [child]: Optional static child passed through to builder without rebuilding
   const AtomBuilder({
     super.key,
     required this.atom,
     required this.builder,
+    this.child,
   });
 
   @override
@@ -62,7 +80,7 @@ class _AtomBuilderState<T> extends State<AtomBuilder<T>> {
   @override
   Widget build(BuildContext context) {
     WidgetRebuildTracker.recordRebuild(widget.atom.id);
-    return widget.builder(context, _value);
+    return widget.builder(context, _value, widget.child);
   }
 }
 
@@ -219,29 +237,3 @@ class _AtomSelectorState<T, S> extends State<AtomSelector<T, S>> {
   }
 }
 
-/// Widget that provides atom value and an optional static child
-class AtomConsumer<T> extends StatelessWidget {
-  /// The atom to subscribe to
-  final Atom<T> atom;
-
-  /// Builder function that receives the current value and child
-  final Widget Function(BuildContext context, T value, Widget? child) builder;
-
-  /// Optional child widget that won't rebuild when atom changes
-  final Widget? child;
-
-  const AtomConsumer({
-    super.key,
-    required this.atom,
-    required this.builder,
-    this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return AtomBuilder<T>(
-      atom: atom,
-      builder: (context, value) => builder(context, value, child),
-    );
-  }
-}

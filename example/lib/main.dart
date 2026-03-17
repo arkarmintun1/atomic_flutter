@@ -340,7 +340,7 @@ class EnhancedAtomicApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return AtomBuilder(
       atom: themeAtom,
-      builder: (context, themeMode) {
+      builder: (context, themeMode, _) {
         return MaterialApp(
           title: 'AtomicFlutter Showcase',
           themeMode: themeMode,
@@ -360,7 +360,7 @@ class MainScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return AtomBuilder(
       atom: tabIndexAtom,
-      builder: (context, index) {
+      builder: (context, index, _) {
         return Scaffold(
           body: IndexedStack(
             index: index,
@@ -381,7 +381,7 @@ class MainScreen extends StatelessWidget {
               BottomNavigationBarItem(
                 icon: AtomBuilder(
                   atom: cartCountAtom,
-                  builder: (context, count) => Badge(
+                  builder: (context, count, _) => Badge(
                     label: Text('$count'),
                     isLabelVisible: count > 0,
                     child: const Icon(Icons.shopping_cart),
@@ -526,7 +526,7 @@ class _EnhancedProductListTabState extends State<EnhancedProductListTab> {
               builder: (context, products) {
                 return AtomBuilder(
                   atom: filteredProductsAtom,
-                  builder: (context, filtered) {
+                  builder: (context, filtered, _) {
                     if (filtered.isEmpty) {
                       return const Center(child: Text('No products found'));
                     }
@@ -601,7 +601,7 @@ class EnhancedCartTab extends StatelessWidget {
         actions: [
           AtomBuilder(
             atom: cartAtom,
-            builder: (context, cart) {
+            builder: (context, cart, _) {
               if (cart.items.isEmpty) return const SizedBox.shrink();
               return IconButton(
                 icon: const Icon(Icons.delete),
@@ -637,7 +637,7 @@ class EnhancedCartTab extends StatelessWidget {
           // SHOWCASE: select() - only rebuilds when total changes
           AtomBuilder(
             atom: cartAtom.select((cart) => cart.totalPrice),
-            builder: (context, total) {
+            builder: (context, total, _) {
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(

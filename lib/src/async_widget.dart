@@ -24,7 +24,7 @@ class AsyncAtomBuilder<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     return AtomBuilder<AsyncValue<T>>(
       atom: atom,
-      builder: (context, asyncValue) {
+      builder: (context, asyncValue, _) {
         return asyncValue.when(
           idle: () => idle(context),
           loading: () => loading(context, asyncValue.data),
@@ -72,7 +72,7 @@ class AsyncBuilder<T> extends StatelessWidget {
   Widget build(BuildContext context) {
     Widget content = AtomBuilder<AsyncValue<T>>(
       atom: atom,
-      builder: (context, asyncValue) {
+      builder: (context, asyncValue, _) {
         return asyncValue.maybeWhen(
           idle: () => idle?.call(context) ?? const SizedBox.shrink(),
           loading: () =>

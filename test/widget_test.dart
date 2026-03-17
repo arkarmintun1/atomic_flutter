@@ -14,7 +14,7 @@ void main() {
         MaterialApp(
           home: AtomBuilder<int>(
             atom: atom,
-            builder: (context, value) => Text('Value: $value'),
+            builder: (context, value, _) => Text('Value: $value'),
           ),
         ),
       );
@@ -37,7 +37,7 @@ void main() {
               children: [
                 AtomBuilder<int>(
                   atom: atom,
-                  builder: (context, value) => Text('Count: $value'),
+                  builder: (context, value, _) => Text('Count: $value'),
                 ),
                 ElevatedButton(
                   onPressed: () => atom.update((v) => v + 1),
@@ -70,7 +70,7 @@ void main() {
         MaterialApp(
           home: AtomBuilder<int>(
             atom: atom,
-            builder: (context, value) {
+            builder: (context, value, _) {
               buildCount++;
               return Text('Value: $value');
             },
@@ -99,11 +99,11 @@ void main() {
             children: [
               AtomBuilder<int>(
                 atom: atom,
-                builder: (context, value) => Text('First: $value'),
+                builder: (context, value, _) => Text('First: $value'),
               ),
               AtomBuilder<int>(
                 atom: atom,
-                builder: (context, value) => Text('Second: ${value * 2}'),
+                builder: (context, value, _) => Text('Second: ${value * 2}'),
               ),
             ],
           ),
@@ -132,7 +132,7 @@ void main() {
         MaterialApp(
           home: AtomBuilder<int>(
             atom: atom,
-            builder: (context, value) => Text('$value'),
+            builder: (context, value, _) => Text('$value'),
           ),
         ),
       );
@@ -158,13 +158,13 @@ void main() {
     });
   });
 
-  group('AtomConsumer Tests', () {
-    testWidgets('should provide atom value to builder', (tester) async {
+  group('AtomBuilder child Tests', () {
+    testWidgets('should provide atom value and child to builder', (tester) async {
       final atom = Atom<String>('test', autoDispose: false);
 
       await tester.pumpWidget(
         MaterialApp(
-          home: AtomConsumer<String>(
+          home: AtomBuilder<String>(
             atom: atom,
             builder: (context, value, child) {
               return Column(
@@ -174,7 +174,7 @@ void main() {
                 ],
               );
             },
-            child: Text('Static child'),
+            child: const Text('Static child'),
           ),
         ),
       );
@@ -197,7 +197,7 @@ void main() {
 
       await tester.pumpWidget(
         MaterialApp(
-          home: AtomConsumer<int>(
+          home: AtomBuilder<int>(
             atom: atom,
             builder: (context, value, child) {
               return Column(
