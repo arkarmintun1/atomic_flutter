@@ -321,3 +321,71 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
     super.dispose();
   }
 }
+
+/// An atom that bridges an external [Stream] into the atom world.
+///
+/// Starts in [AsyncState.loading] and transitions to [AsyncState.success] on
+/// each emitted event, or [AsyncState.error] on stream errors. When the stream
+/// closes normally the atom retains its last state — the data is still valid.
+///
+/// The subscription is automatically cancelled when the atom is disposed.
+///
+/// ```dart
+/// final positionAtom = StreamAtom(Geolocator.getPositionStream());
+///
+/// final messagesAtom = StreamAtom(
+///   chatSocket.messages,
+///   keepPreviousDataOnError: true, // show stale data alongside the error
+/// );
+/// ```
+class StreamAtom<T> extends AsyncAtom<T> {
+  StreamSubscription<T>? _subscription;
+
+  StreamAtom(
+    Stream<T> stream, {
+    String? id,
+    bool autoDispose = true,
+    Duration? disposeTimeout,
+    bool keepPreviousDataOnError = false,
+  }) : super(
+          initialValue: const AsyncValue.loading(),
+          id: id,
+          autoDispose: autoDispose,
+          disposeTimeout: disposeTimeout,
+        ) {
+    _subscribe(stream, keepPreviousDataOnError: keepPreviousDataOnError);
+  }
+
+  void _subscribe(Stream<T> stream, {bool keepPreviousDataOnError = false}) {
+    _subscription?.cancel();
+    _subscription = stream.listen(
+      setData,
+      onError: (Object error, StackTrace stackTrace) {
+        if (keepPreviousDataOnError) {
+          set(AsyncValue.error(error, stackTrace, data: value.data));
+        } else {
+          setError(error, stackTrace);
+        }
+      },
+      onDone: () => _subscription = null,
+    );
+  }
+
+  /// Replace the current stream with a new one.
+  ///
+  /// Cancels the existing subscription and subscribes to [newStream].
+  /// Transitions back to [AsyncState.loading] until the first event arrives.
+  ///
+  /// Useful for reconnecting to a WebSocket or refreshing a live query.
+  void reconnect(Stream<T> newStream, {bool keepPreviousDataOnError = false}) {
+    set(const AsyncValue.loading());
+    _subscribe(newStream, keepPreviousDataOnError: keepPreviousDataOnError);
+  }
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    _subscription = null;
+    super.dispose();
+  }
+}

@@ -118,12 +118,21 @@ cartAtom.select<double>(
 )
 ```
 
-### 4. Retry with Exponential Backoff
+### 4. Retry with Backoff
 ```dart
+// Exponential backoff (default): 1s, 2s, 4s...
 await productsAsyncAtom.executeWithRetry(
   () => api.getProducts(),
   maxRetries: 3,
-  delay: const Duration(seconds: 1),  // 1s, 2s, 3s delays
+  delay: const Duration(seconds: 1),
+);
+
+// Linear backoff: 1s, 2s, 3s...
+await productsAsyncAtom.executeWithRetry(
+  () => api.getProducts(),
+  maxRetries: 3,
+  delay: const Duration(seconds: 1),
+  exponential: false,
 );
 ```
 

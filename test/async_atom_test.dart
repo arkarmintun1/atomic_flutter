@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:atomic_flutter/atomic_flutter.dart';
 
@@ -560,6 +562,177 @@ void main() {
       atom1.dispose();
       atom2.dispose();
       atom3.dispose();
+    });
+  });
+
+  group('StreamAtom Tests', () {
+    test('should start in loading state', () {
+      final controller = StreamController<int>();
+      final atom = StreamAtom(controller.stream);
+
+      expect(atom.value.isLoading, true);
+
+      atom.dispose();
+      controller.close();
+    });
+
+    test('should transition to success on first event', () async {
+      final controller = StreamController<int>();
+      final atom = StreamAtom(controller.stream);
+
+      controller.add(42);
+      await Future.delayed(Duration.zero);
+
+      expect(atom.value.hasValue, true);
+      expect(atom.value.value, 42);
+
+      atom.dispose();
+      controller.close();
+    });
+
+    test('should update on subsequent stream events', () async {
+      final controller = StreamController<int>();
+      final atom = StreamAtom(controller.stream);
+
+      controller.add(1);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 1);
+
+      controller.add(2);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 2);
+
+      controller.add(3);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 3);
+
+      atom.dispose();
+      controller.close();
+    });
+
+    test('should transition to error on stream error', () async {
+      final controller = StreamController<int>();
+      final atom = StreamAtom(controller.stream);
+
+      controller.addError(Exception('stream failed'), StackTrace.empty);
+      await Future.delayed(Duration.zero);
+
+      expect(atom.value.hasError, true);
+      expect(atom.value.error.toString(), contains('stream failed'));
+
+      atom.dispose();
+      controller.close();
+    });
+
+    test('keepPreviousDataOnError preserves last value alongside error',
+        () async {
+      final controller = StreamController<int>();
+      final atom = StreamAtom(controller.stream, keepPreviousDataOnError: true);
+
+      controller.add(99);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 99);
+
+      controller.addError(Exception('oops'), StackTrace.empty);
+      await Future.delayed(Duration.zero);
+
+      expect(atom.value.hasError, true);
+      expect(atom.value.data, 99); // stale data preserved
+    });
+
+    test('should retain last state when stream closes normally', () async {
+      final controller = StreamController<int>();
+      final atom = StreamAtom(controller.stream);
+
+      controller.add(7);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 7);
+
+      await controller.close();
+      await Future.delayed(Duration.zero);
+
+      // State should not reset after stream done
+      expect(atom.value.hasValue, true);
+      expect(atom.value.value, 7);
+
+      atom.dispose();
+    });
+
+    test('should notify listeners when stream emits', () async {
+      final controller = StreamController<int>();
+      final atom = StreamAtom(controller.stream);
+      final received = <int>[];
+
+      atom.addListener((v) {
+        if (v.hasValue) received.add(v.value);
+      });
+
+      controller.add(10);
+      controller.add(20);
+      controller.add(30);
+      await Future.delayed(Duration.zero);
+
+      expect(received, [10, 20, 30]);
+
+      atom.dispose();
+      controller.close();
+    });
+
+    test('reconnect replaces stream and resets to loading', () async {
+      final controller1 = StreamController<int>();
+      final controller2 = StreamController<int>();
+      final atom = StreamAtom(controller1.stream);
+
+      controller1.add(1);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 1);
+
+      atom.reconnect(controller2.stream);
+      expect(atom.value.isLoading, true); // reset immediately
+
+      controller2.add(99);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 99);
+
+      atom.dispose();
+      controller1.close();
+      controller2.close();
+    });
+
+    test('reconnect cancels old subscription', () async {
+      final controller1 = StreamController<int>();
+      final controller2 = StreamController<int>();
+      final atom = StreamAtom(controller1.stream);
+
+      atom.reconnect(controller2.stream);
+
+      // Events from old stream should be ignored
+      controller1.add(999);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.isLoading, true); // still loading, old stream ignored
+
+      controller2.add(1);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 1);
+
+      atom.dispose();
+      controller1.close();
+      controller2.close();
+    });
+
+    test('should cancel subscription on dispose', () async {
+      final controller = StreamController<int>();
+      final atom = StreamAtom(controller.stream);
+
+      controller.add(1);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 1);
+
+      atom.dispose();
+
+      // Adding after dispose should not throw and atom should not update
+      expect(() => controller.add(2), returnsNormally);
+      controller.close();
     });
   });
 }

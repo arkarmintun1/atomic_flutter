@@ -469,22 +469,73 @@ void main() {
       );
     });
 
-    test('should throw StateError with helpful message on circular dependency',
-        () {
-      final a = Atom<int>(1, id: 'atomA', autoDispose: false);
-      final b = computed(() => a.value + 1, tracked: [a], id: 'atomB');
+    test('error message shows 1-hop cycle path', () {
+      // Trick: Atom equality is by id. Create a base atom with id 'price',
+      // make 'discount' depend on it, then try to create a NEW computed also
+      // named 'price' that tracks 'discount'. The detector sees 'price'(base)
+      // inside 'discount._dependencies' and considers it == the new 'price'
+      // computed (same id), exposing the cycle: price → discount → price.
+      final priceBase = Atom<int>(100, id: 'price', autoDispose: false);
+      final discount = computed(
+        () => priceBase.value ~/ 10,
+        tracked: [priceBase],
+        id: 'discount',
+        autoDispose: false,
+      );
 
-      // Create a scenario where we try to make b depend on something that depends on b
-      // This is tricky because b is already created. Let's create c that depends on b,
-      // then try to make b depend on c (which we can't do directly with the current API)
+      expect(
+        () => computed(
+          () => discount.value + 1,
+          tracked: [discount],
+          id: 'price', // same id as priceBase → cycle detected
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            contains('price → discount → price'),
+          ),
+        ),
+      );
+    });
 
-      // Instead, let's test the error message format
-      final c = computed(() => b.value + 1, tracked: [b], id: 'atomC');
+    test('error message shows multi-hop cycle path', () {
+      // Setup chain: total → discount → price (base atom named 'total')
+      // Then try to create a new computed named 'total' that tracks 'total_mid'.
+      // Cycle: total → total_mid → discount → price_base(id=total) → total
+      final totalBase = Atom<int>(0, id: 'total', autoDispose: false);
+      final price = Atom<int>(100, id: 'price', autoDispose: false);
+      final discount = computed(
+        () => price.value ~/ 10,
+        tracked: [price],
+        id: 'discount',
+        autoDispose: false,
+      );
+      final subtotal = computed(
+        () => price.value - discount.value + totalBase.value,
+        tracked: [price, discount, totalBase],
+        id: 'subtotal',
+        autoDispose: false,
+      );
 
-      // The check happens during creation, so this is hard to test directly
-      // with the current API since we can't modify dependencies after creation.
-      // The test is more about ensuring the function exists and works correctly.
-      expect(c.value, 3); // This should work fine
+      expect(
+        () => computed(
+          () => subtotal.value * 2,
+          tracked: [subtotal],
+          id: 'total', // same id as totalBase → cycle via subtotal → totalBase
+        ),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains('Circular dependency detected'),
+              contains('total'),
+              contains('subtotal'),
+            ),
+          ),
+        ),
+      );
     });
 
     test('should allow complex non-circular dependency graphs', () {
@@ -619,6 +670,105 @@ void main() {
 
       atom.set(10);
       expect(atom.value, 10);
+    });
+  });
+
+  group('Custom Equality Tests', () {
+    test('should not notify when custom equals returns true', () {
+      final atom = Atom<List<int>>(
+        [1, 2, 3],
+        equals: (a, b) {
+          if (a.length != b.length) return false;
+          for (int i = 0; i < a.length; i++) {
+            if (a[i] != b[i]) return false;
+          }
+          return true;
+        },
+      );
+      int notificationCount = 0;
+      atom.addListener((_) => notificationCount++);
+
+      // Different list instance, same contents → should NOT notify
+      atom.set([1, 2, 3]);
+      expect(notificationCount, 0);
+      expect(atom.value, [1, 2, 3]);
+    });
+
+    test('should notify when custom equals returns false', () {
+      final atom = Atom<List<int>>(
+        [1, 2, 3],
+        equals: (a, b) {
+          if (a.length != b.length) return false;
+          for (int i = 0; i < a.length; i++) {
+            if (a[i] != b[i]) return false;
+          }
+          return true;
+        },
+      );
+      int notificationCount = 0;
+      atom.addListener((_) => notificationCount++);
+
+      // Different contents → should notify
+      atom.set([1, 2, 4]);
+      expect(notificationCount, 1);
+      expect(atom.value, [1, 2, 4]);
+    });
+
+    test('should support field-based equality for objects', () {
+      final atom = Atom<Map<String, dynamic>>(
+        {'id': 1, 'name': 'Alice'},
+        equals: (a, b) => a['id'] == b['id'],
+      );
+      int notificationCount = 0;
+      atom.addListener((_) => notificationCount++);
+
+      // Same id, different name → should NOT notify
+      atom.set({'id': 1, 'name': 'Bob'});
+      expect(notificationCount, 0);
+
+      // Different id → should notify
+      atom.set({'id': 2, 'name': 'Bob'});
+      expect(notificationCount, 1);
+    });
+
+    test('computed atom should respect custom equals', () {
+      final sourceAtom = Atom<int>(1);
+      int notificationCount = 0;
+
+      // Computed atom that always returns a new list, but contents may be equal
+      final computedAtom = computed<List<int>>(
+        () => List.generate(sourceAtom.value, (i) => i),
+        tracked: [sourceAtom],
+        equals: (a, b) {
+          if (a.length != b.length) return false;
+          for (int i = 0; i < a.length; i++) {
+            if (a[i] != b[i]) return false;
+          }
+          return true;
+        },
+      );
+      computedAtom.addListener((_) => notificationCount++);
+
+      // Set source to same value → computed returns identical list contents
+      sourceAtom.set(1);
+      expect(notificationCount, 0);
+
+      // Set source to new value → computed returns different list
+      sourceAtom.set(3);
+      expect(notificationCount, 1);
+      expect(computedAtom.value, [0, 1, 2]);
+    });
+
+    test('default equality uses == for value types', () {
+      final atom = Atom<int>(5);
+      int notificationCount = 0;
+      atom.addListener((_) => notificationCount++);
+
+      atom.set(5); // same value
+      expect(notificationCount, 0);
+
+      atom.set(6); // different value
+      expect(notificationCount, 1);
     });
   });
 }

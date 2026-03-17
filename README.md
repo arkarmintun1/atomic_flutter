@@ -382,11 +382,19 @@ final userNamesAtom = usersAtom.mapAsync((users) =>
 // Execute only if not currently loading
 await dataAtom.executeIfNotLoading(() => api.fetchData());
 
-// Execute with automatic retry
+// Execute with automatic retry — exponential backoff (default): 1s, 2s, 4s...
 await dataAtom.executeWithRetry(
   () => api.fetchData(),
   maxRetries: 3,
-  delay: Duration(seconds: 1), // Exponential backoff
+  delay: Duration(seconds: 1),
+);
+
+// Linear backoff: 1s, 2s, 3s...
+await dataAtom.executeWithRetry(
+  () => api.fetchData(),
+  maxRetries: 3,
+  delay: Duration(seconds: 1),
+  exponential: false,
 );
 
 // Chain async operations

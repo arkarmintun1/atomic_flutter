@@ -71,10 +71,18 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
   }
 
   /// Execute with automatic retry on failure
+  ///
+  /// [maxRetries]: Maximum number of attempts before giving up
+  /// [delay]: Base delay between retries
+  /// [maxDelay]: Upper bound on delay (only applies to exponential)
+  /// [exponential]: If true, uses exponential backoff (1x, 2x, 4x, 8x...);
+  /// if false, uses linear backoff (1x, 2x, 3x, 4x...)
   Future<T> executeWithRetry(
     Future<T> Function() operation, {
     int maxRetries = 3,
     Duration delay = const Duration(seconds: 1),
+    Duration maxDelay = const Duration(seconds: 30),
+    bool exponential = true,
   }) async {
     int attempts = 0;
 
@@ -84,7 +92,12 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
       } catch (e) {
         attempts++;
         if (attempts >= maxRetries) rethrow;
-        await Future.delayed(delay * attempts); // Exponential backoff
+        final waitDuration = exponential
+            ? delay * (1 << (attempts - 1)) // 1x, 2x, 4x, 8x...
+            : delay * attempts; // 1x, 2x, 3x, 4x...
+        await Future.delayed(
+          exponential && waitDuration > maxDelay ? maxDelay : waitDuration,
+        );
       }
     }
 

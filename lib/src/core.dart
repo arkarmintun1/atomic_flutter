@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 class Atom<T> {
   final String _id;
   T _value;
+  final bool Function(T, T)? _equals;
   final Set<_AtomListener<T>> _listeners = {};
   final Set<WeakReference<Atom>> _dependencies = {};
   final Set<WeakReference<Atom>> _dependents = {};
@@ -32,14 +33,25 @@ class Atom<T> {
   /// [id]: Optional identifier for debugging (auto-generated if not provided)
   /// [autoDispose]: Whether this atom should be automatically disposed when no longer used
   /// [disposeTimeout]: How long to wait before disposing unused atoms
+  /// [equals]: Optional custom equality function. When provided, replaces the
+  /// default `==` check to determine whether a new value should trigger
+  /// listener notifications. Useful for collections or objects where reference
+  /// equality differs from value equality:
+  ///
+  /// ```dart
+  /// final listAtom = Atom<List<int>>([], equals: listEquals);
+  /// final userAtom = Atom<User>(User.empty(), equals: (a, b) => a.id == b.id);
+  /// ```
   Atom(
     this._value, {
     String? id,
     bool autoDispose = true,
     Duration? disposeTimeout,
+    bool Function(T, T)? equals,
   })  : _id = id ?? 'atom_${identityHashCode(_value)}',
         _autoDispose = autoDispose,
-        _disposeTimeout = disposeTimeout {
+        _disposeTimeout = disposeTimeout,
+        _equals = equals {
     if (debugMode) {
       AtomDebugger.register(this);
     }
@@ -98,9 +110,13 @@ class Atom<T> {
   /// Update the atom value with explicit mutation
   ///
   /// This will notify all listeners if the value actually changes.
-  /// Uses `==` comparison to determine if the value has changed.
+  /// Uses the custom [equals] function if provided, otherwise falls back to
+  /// identity check (`identical`) and then `==`.
   void set(T newValue) {
-    if (identical(_value, newValue) && _value == newValue) return;
+    final isEqual = _equals != null
+        ? _equals!(_value, newValue)
+        : (identical(_value, newValue) || _value == newValue);
+    if (isEqual) return;
 
     _value = newValue;
 
@@ -312,11 +328,15 @@ class _ComputedAtom<T> extends Atom<T> {
     super.id,
     super.autoDispose,
     super.disposeTimeout,
+    super.equals,
   });
 
   void _computeValue() {
     final newValue = _computeFunction();
-    if (newValue != value) {
+    final isEqual = _equals != null
+        ? _equals!(_value, newValue)
+        : (identical(_value, newValue) || _value == newValue);
+    if (!isEqual) {
       super.set(newValue); // Use super.set to bypass override
     }
   }
@@ -345,6 +365,7 @@ class _ComputedAtom<T> extends Atom<T> {
 /// [id]: Optional identifier for debugging
 /// [autoDispose]: Whether this atom should be auto-disposed when no longer used
 /// [disposeTimeout]: How long to wait before disposing unused computed atoms
+/// [equals]: Optional custom equality function (see [Atom] constructor)
 ///
 /// Throws [StateError] if circular dependencies are detected.
 Atom<R> computed<R>(
@@ -353,6 +374,7 @@ Atom<R> computed<R>(
   String? id,
   bool autoDispose = true,
   Duration? disposeTimeout,
+  bool Function(R, R)? equals,
 }) {
   final derivedAtom = _ComputedAtom<R>(
     compute(),
@@ -360,14 +382,18 @@ Atom<R> computed<R>(
     id: id,
     autoDispose: autoDispose,
     disposeTimeout: disposeTimeout,
+    equals: equals,
   );
 
   // Check for circular dependencies before establishing connections
   for (final atom in tracked) {
-    if (_hasCircularDependency(atom, derivedAtom)) {
+    final path = _findCyclePath(atom, derivedAtom, [atom.id], {});
+    if (path != null) {
+      // Prepend derivedAtom so the displayed cycle starts and ends with it:
+      // e.g. "priceAtom → discountAtom → totalAtom → priceAtom"
+      final cycleDisplay = [derivedAtom.id, ...path].join(' → ');
       throw StateError(
-        'Circular dependency detected: Atom "${derivedAtom.id}" cannot depend on '
-        '"${atom.id}" because it would create a cycle in the dependency graph.',
+        'Circular dependency detected:\n  $cycleDisplay',
       );
     }
   }
@@ -383,40 +409,35 @@ Atom<R> computed<R>(
   return derivedAtom;
 }
 
-/// Check if adding a dependency would create a circular dependency
+/// Returns the dependency path from [source] to [target] if one exists,
+/// or null if no path exists.
 ///
-/// This performs a depth-first search through the dependency graph
-/// to detect cycles.
-bool _hasCircularDependency(Atom dependency, Atom dependent) {
-  // Check if the dependency already depends on the dependent (directly or indirectly)
-  return _dependsOn(dependency, dependent, <Atom>{});
-}
-
-/// Recursively check if 'source' depends on 'target'
-bool _dependsOn(Atom source, Atom target, Set<Atom> visited) {
-  // Prevent infinite loops in case of existing cycles
-  if (visited.contains(source)) {
-    return false;
-  }
+/// [path] is a mutable list pre-seeded with [source.id] by the caller.
+/// On success it is populated with every node id from source to target
+/// (inclusive). On failure its contents are undefined.
+List<String>? _findCyclePath(
+  Atom source,
+  Atom target,
+  List<String> path,
+  Set<Atom> visited,
+) {
+  if (visited.contains(source)) return null;
   visited.add(source);
 
-  // Get all dependencies of the source atom
   for (final weakRef in source._dependencies) {
     final dep = weakRef.target;
     if (dep == null) continue;
 
-    // Direct dependency match
-    if (dep == target) {
-      return true;
-    }
+    path.add(dep.id);
+    if (dep == target) return List.from(path);
 
-    // Check transitive dependencies
-    if (_dependsOn(dep, target, visited)) {
-      return true;
-    }
+    final result = _findCyclePath(dep, target, path, visited);
+    if (result != null) return result;
+
+    path.removeLast(); // backtrack
   }
 
-  return false;
+  return null;
 }
 
 /// Atom family for creating related atoms with different keys
