@@ -73,7 +73,7 @@ class _AtomicFlutterAppState extends State<AtomicFlutterApp> {
               size: 18,
               color: _selectedTab == 4
                   ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface.withOpacity(0.6),
+                  : theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
             tooltip: 'Settings',
             onPressed: () => setState(() => _selectedTab = 4),

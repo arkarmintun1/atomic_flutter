@@ -150,7 +150,7 @@ class _AsyncTimelinePanelState extends State<AsyncTimelinePanel> {
           Text(
             '${_operations.length} operations',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(width: 8),
@@ -176,7 +176,7 @@ class _AsyncTimelinePanelState extends State<AsyncTimelinePanel> {
       children: [
         // Header
         Container(
-          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           child: Row(
             children: [
@@ -229,7 +229,7 @@ class _AsyncTimelinePanelState extends State<AsyncTimelinePanel> {
         _selectedOperation = isSelected ? null : op;
       }),
       child: Container(
-        color: isSelected ? theme.colorScheme.primary.withOpacity(0.08) : null,
+        color: isSelected ? theme.colorScheme.primary.withValues(alpha: 0.08) : null,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
@@ -241,7 +241,7 @@ class _AsyncTimelinePanelState extends State<AsyncTimelinePanel> {
                 style: theme.textTheme.bodySmall?.copyWith(
                   fontFamily: 'monospace',
                   fontSize: 11,
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                 ),
               ),
             ),
@@ -324,7 +324,7 @@ class _AsyncTimelinePanelState extends State<AsyncTimelinePanel> {
       children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           child: Row(
             children: [
               Expanded(
@@ -365,9 +365,9 @@ class _AsyncTimelinePanelState extends State<AsyncTimelinePanel> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.05),
+                    color: Colors.red.withValues(alpha: 0.05),
                     borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.red.withOpacity(0.2)),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                   ),
                   child: SelectableText(
                     op.resultEvent!.error!,
@@ -433,8 +433,8 @@ class _DurationBar extends StatelessWidget {
         child: SizedBox(
           height: 8,
           child: LinearProgressIndicator(
-            backgroundColor: color.withOpacity(0.1),
-            valueColor: AlwaysStoppedAnimation(color.withOpacity(0.5)),
+            backgroundColor: color.withValues(alpha: 0.1),
+            valueColor: AlwaysStoppedAnimation(color.withValues(alpha: 0.5)),
           ),
         ),
       );
@@ -451,7 +451,7 @@ class _DurationBar extends StatelessWidget {
             height: 8,
             width: constraints.maxWidth * fraction,
             decoration: BoxDecoration(
-              color: color.withOpacity(0.6),
+              color: color.withValues(alpha: 0.6),
               borderRadius: BorderRadius.circular(3),
             ),
           ),
@@ -477,7 +477,7 @@ class _CountChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
@@ -508,7 +508,7 @@ class _DetailRow extends StatelessWidget {
             width: 80,
             child: Text(label,
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6))),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
           ),
           Expanded(
             child: Text(value,

@@ -124,7 +124,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
         Text(
           'Control how frequently each panel fetches data from the running app.',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 16),
@@ -166,7 +166,7 @@ class _SettingsPanelState extends State<SettingsPanel> {
         Text(
           'Export a JSON snapshot of all atom state, metrics, and diagnostics to the clipboard.',
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
         const SizedBox(height: 12),
@@ -236,7 +236,7 @@ class _IntervalSetting extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon,
-              size: 16, color: theme.colorScheme.onSurface.withOpacity(0.6)),
+              size: 16, color: theme.colorScheme.onSurface.withValues(alpha: 0.6)),
           const SizedBox(width: 8),
           SizedBox(
             width: 140,
@@ -284,7 +284,7 @@ class _AboutRow extends StatelessWidget {
             width: 80,
             child: Text(label,
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6))),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
           ),
           Text(value, style: theme.textTheme.bodySmall),
         ],

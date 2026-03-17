@@ -1,6 +1,5 @@
-import 'package:flutter/widgets.dart';
-import 'package:flutter_test/flutter_test.dart';
 import 'package:atomic_flutter/atomic_flutter.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Atom Extensions Tests', () {
@@ -628,6 +627,5 @@ void main() {
 
       expect(values, [10, 20]);
     });
-
   });
 }

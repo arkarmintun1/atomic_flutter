@@ -112,7 +112,7 @@ class GraphPainter extends CustomPainter {
     // Shadow
     if (isHovered || node.isHighlighted) {
       final shadowPaint = Paint()
-        ..color = node.color.withOpacity(0.2)
+        ..color = node.color.withValues(alpha: 0.2)
         ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
       canvas.drawCircle(center, node.radius + 4, shadowPaint);
     }
@@ -120,8 +120,8 @@ class GraphPainter extends CustomPainter {
     // Node circle
     final fillPaint = Paint()
       ..color = node.isDimmed
-          ? node.color.withOpacity(0.2)
-          : node.color.withOpacity(isHovered ? 1.0 : 0.85)
+          ? node.color.withValues(alpha: 0.2)
+          : node.color.withValues(alpha: isHovered ? 1.0 : 0.85)
       ..style = PaintingStyle.fill;
     canvas.drawCircle(center, node.radius, fillPaint);
 
@@ -131,7 +131,7 @@ class GraphPainter extends CustomPainter {
           ? Colors.grey.shade300
           : (isHovered || node.isHighlighted)
               ? node.color
-              : node.color.withOpacity(0.6)
+              : node.color.withValues(alpha: 0.6)
       ..strokeWidth = (isHovered || node.isHighlighted) ? 2.5 : 1.5
       ..style = PaintingStyle.stroke;
     canvas.drawCircle(center, node.radius, borderPaint);

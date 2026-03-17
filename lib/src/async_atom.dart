@@ -343,15 +343,12 @@ class StreamAtom<T> extends AsyncAtom<T> {
 
   StreamAtom(
     Stream<T> stream, {
-    String? id,
-    bool autoDispose = true,
-    Duration? disposeTimeout,
+    super.id,
+    super.autoDispose = true,
+    super.disposeTimeout,
     bool keepPreviousDataOnError = false,
   }) : super(
           initialValue: const AsyncValue.loading(),
-          id: id,
-          autoDispose: autoDispose,
-          disposeTimeout: disposeTimeout,
         ) {
     _subscribe(stream, keepPreviousDataOnError: keepPreviousDataOnError);
   }

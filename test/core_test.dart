@@ -1,5 +1,5 @@
-import 'package:flutter_test/flutter_test.dart';
 import 'package:atomic_flutter/atomic_flutter.dart';
+import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   group('Atom Core Tests', () {
@@ -602,7 +602,6 @@ void main() {
       enableDebugMode();
 
       final atom = Atom<int>(0, id: 'testAtom');
-      final messages = <String>[];
 
       // Capture print output (in real app, errors go to console)
       atom.addListener((value) {

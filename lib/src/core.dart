@@ -114,7 +114,7 @@ class Atom<T> {
   /// identity check (`identical`) and then `==`.
   void set(T newValue) {
     final isEqual = _equals != null
-        ? _equals!(_value, newValue)
+        ? _equals(_value, newValue)
         : (identical(_value, newValue) || _value == newValue);
     if (isEqual) return;
 
@@ -334,7 +334,7 @@ class _ComputedAtom<T> extends Atom<T> {
   void _computeValue() {
     final newValue = _computeFunction();
     final isEqual = _equals != null
-        ? _equals!(_value, newValue)
+        ? _equals(_value, newValue)
         : (identical(_value, newValue) || _value == newValue);
     if (!isEqual) {
       super.set(newValue); // Use super.set to bypass override

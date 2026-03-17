@@ -83,7 +83,7 @@ class _AtomTableState extends State<AtomTable> {
 
   Widget _buildHeaderRow(ThemeData theme) {
     return Container(
-      color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+      color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
@@ -131,7 +131,7 @@ class _AtomTableState extends State<AtomTable> {
     return InkWell(
       onTap: () => widget.onAtomSelected(atom.id),
       child: Container(
-        color: isSelected ? theme.colorScheme.primary.withOpacity(0.08) : null,
+        color: isSelected ? theme.colorScheme.primary.withValues(alpha: 0.08) : null,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         child: Row(
           children: [
@@ -162,7 +162,7 @@ class _AtomTableState extends State<AtomTable> {
               child: Text(
                 atom.type,
                 style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurface.withOpacity(0.7),
+                  color: theme.colorScheme.onSurface.withValues(alpha: 0.7),
                   fontFamily: 'monospace',
                   fontSize: 11,
                 ),
@@ -274,7 +274,7 @@ class _StatusBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(

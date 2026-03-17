@@ -181,7 +181,7 @@ class _PerformancePanelState extends State<PerformancePanel> {
       return Text(
         'No update metrics recorded yet. Enable performance monitoring.',
         style: theme.textTheme.bodySmall
-            ?.copyWith(color: theme.colorScheme.onSurface.withOpacity(0.5)),
+            ?.copyWith(color: theme.colorScheme.onSurface.withValues(alpha: 0.5)),
       );
     }
 
@@ -255,7 +255,7 @@ class _SummaryTile extends StatelessWidget {
         Text(
           label,
           style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
           ),
         ),
       ],
@@ -310,7 +310,7 @@ class _MetricRow extends StatelessWidget {
                     height: 16,
                     width: constraints.maxWidth * fraction,
                     decoration: BoxDecoration(
-                      color: color.withOpacity(0.6),
+                      color: color.withValues(alpha: 0.6),
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
@@ -336,7 +336,7 @@ class _MetricRow extends StatelessWidget {
                     subtext!,
                     style: theme.textTheme.bodySmall?.copyWith(
                       fontSize: 10,
-                      color: theme.colorScheme.onSurface.withOpacity(0.5),
+                      color: theme.colorScheme.onSurface.withValues(alpha: 0.5),
                     ),
                   ),
               ],
@@ -359,10 +359,10 @@ class _HotAtomCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      color: Colors.orange.withOpacity(0.05),
+      color: Colors.orange.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.orange.withOpacity(0.2)),
+        side: BorderSide(color: Colors.orange.withValues(alpha: 0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -431,10 +431,10 @@ class _LeakCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(vertical: 4),
-      color: Colors.red.withOpacity(0.05),
+      color: Colors.red.withValues(alpha: 0.05),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(8),
-        side: BorderSide(color: Colors.red.withOpacity(0.2)),
+        side: BorderSide(color: Colors.red.withValues(alpha: 0.2)),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -481,7 +481,7 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(

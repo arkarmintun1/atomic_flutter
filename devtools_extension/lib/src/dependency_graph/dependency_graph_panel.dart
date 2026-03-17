@@ -310,7 +310,7 @@ class _DependencyGraphPanelState extends State<DependencyGraphPanel> {
           Text(
             '${_graphData.nodes.length} nodes, ${_graphData.edges.length} edges',
             style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurface.withOpacity(0.6),
+              color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(width: 8),
@@ -491,7 +491,7 @@ class _DetailRow extends StatelessWidget {
             width: 80,
             child: Text(label,
                 style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurface.withOpacity(0.6))),
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.6))),
           ),
           Expanded(
             child: Text(value,

@@ -24,7 +24,7 @@ class AtomDetailView extends StatelessWidget {
         // Header
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
           child: Row(
             children: [
               Icon(
@@ -81,7 +81,7 @@ class AtomDetailView extends StatelessWidget {
         Text(
           label,
           style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -105,7 +105,7 @@ class AtomDetailView extends StatelessWidget {
             Text(
               'Current Value',
               style: theme.textTheme.labelSmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -131,10 +131,10 @@ class AtomDetailView extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerHighest.withOpacity(0.3),
+            color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: theme.colorScheme.outline.withOpacity(0.2),
+              color: theme.colorScheme.outline.withValues(alpha: 0.2),
             ),
           ),
           child: SelectableText(
@@ -156,7 +156,7 @@ class AtomDetailView extends StatelessWidget {
         Text(
           'Metadata',
           style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -184,7 +184,7 @@ class AtomDetailView extends StatelessWidget {
         Text(
           'Async State',
           style: theme.textTheme.labelSmall?.copyWith(
-            color: theme.colorScheme.onSurface.withOpacity(0.6),
+            color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
             fontWeight: FontWeight.bold,
           ),
         ),
@@ -194,7 +194,7 @@ class AtomDetailView extends StatelessWidget {
           valueWidget: Container(
             padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
             decoration: BoxDecoration(
-              color: stateColor.withOpacity(0.1),
+              color: stateColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(4),
             ),
             child: Text(
@@ -216,9 +216,9 @@ class AtomDetailView extends StatelessWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.05),
+              color: Colors.red.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(6),
-              border: Border.all(color: Colors.red.withOpacity(0.2)),
+              border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
             ),
             child: Text(
               detail.error!,
@@ -265,7 +265,7 @@ class _MetadataRow extends StatelessWidget {
             child: Text(
               label,
               style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurface.withOpacity(0.6),
+                color: theme.colorScheme.onSurface.withValues(alpha: 0.6),
               ),
             ),
           ),
