@@ -101,7 +101,13 @@ extension AtomExtensions<T> on Atom<T> {
     );
 
     void listener(T newValue) {
-      selectedAtom.set(selector(newValue));
+      try {
+        selectedAtom.set(selector(newValue));
+      } catch (e) {
+        if (Atom.debugMode) {
+          print('AtomicFlutter: Selector error in atom $id: $e');
+        }
+      }
     }
 
     addListener(listener);

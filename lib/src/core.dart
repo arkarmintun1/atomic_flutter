@@ -17,7 +17,7 @@ class Atom<T> {
   final Set<_AtomListener<T>> _listeners = {};
   final Set<WeakReference<Atom>> _dependencies = {};
   final Set<WeakReference<Atom>> _dependents = {};
-  bool _isBatching = false;
+  int _batchDepth = 0;
   bool _isDirty = false;
 
   // Memory management properties
@@ -185,7 +185,7 @@ class Atom<T> {
   }
 
   void _notifyListeners() {
-    if (_isBatching) {
+    if (_batchDepth > 0) {
       _isDirty = true;
       return;
     }
@@ -246,12 +246,12 @@ class Atom<T> {
   /// Use this when you need to update multiple related atoms and
   /// want to prevent UI from rebuilding until all updates are complete.
   void batch(void Function() actions) {
-    _isBatching = true;
+    _batchDepth++;
     try {
       actions();
     } finally {
-      _isBatching = false;
-      if (_isDirty) {
+      _batchDepth--;
+      if (_batchDepth == 0 && _isDirty) {
         _isDirty = false;
         _notifyListeners();
       }
