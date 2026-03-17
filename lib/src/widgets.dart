@@ -128,6 +128,7 @@ class _MultiAtomBuilderState extends State<MultiAtomBuilder> {
 
   void _setupListeners() {
     for (final atom in widget.atoms) {
+      if (_listeners.containsKey(atom)) continue;
       void listener(dynamic value) => _onAtomChanged();
       atom.addListener(listener);
       _listeners[atom] = listener;

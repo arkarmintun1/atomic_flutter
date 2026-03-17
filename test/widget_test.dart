@@ -404,5 +404,33 @@ void main() {
       atom2.dispose();
       atom3.dispose();
     });
+
+    testWidgets('duplicate atoms in list do not leak listeners',
+        (tester) async {
+      final atom = Atom<int>(0, autoDispose: false);
+      int buildCount = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: MultiAtomBuilder(
+            atoms: [atom, atom], // duplicate
+            builder: (context) {
+              buildCount++;
+              return Text('${atom.value}');
+            },
+          ),
+        ),
+      );
+
+      expect(buildCount, 1);
+
+      atom.set(1);
+      await tester.pump();
+
+      // Should rebuild exactly once, not twice
+      expect(buildCount, 2);
+
+      atom.dispose();
+    });
   });
 }
