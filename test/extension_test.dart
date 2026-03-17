@@ -612,20 +612,22 @@ void main() {
   });
 
   group('Utility Functions Tests', () {
-    test('batchAtomUpdates should work', () {
-      final atom1 = Atom<int>(1);
-      final atom2 = Atom<int>(2);
-      final values = <int>[];
+    test('atomicUpdate should batch notifications', () {
+      final atom1 = Atom<int>(1, id: 'util1');
+      final atom2 = Atom<int>(2, id: 'util2');
+      int calls = 0;
 
-      atom1.addListener((value) => values.add(value));
-      atom2.addListener((value) => values.add(value));
+      atom1.addListener((_) => calls++);
+      atom2.addListener((_) => calls++);
 
-      batchAtomUpdates(() {
+      atomicUpdate(() {
         atom1.set(10);
         atom2.set(20);
       });
 
-      expect(values, [10, 20]);
+      expect(calls, 2);
+      expect(atom1.value, 10);
+      expect(atom2.value, 20);
     });
   });
 }

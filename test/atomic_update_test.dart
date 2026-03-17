@@ -113,22 +113,6 @@ void main() {
       atom.dispose();
     });
 
-    test('batchAtomUpdates is an alias for atomicUpdate', () {
-      final atom = Atom<int>(0, autoDispose: false);
-      int calls = 0;
-      atom.addListener((_) => calls++);
-
-      batchAtomUpdates(() {
-        atom.set(1);
-        atom.set(2);
-        atom.set(3);
-      });
-
-      expect(calls, 1);
-      expect(atom.value, 3);
-
-      atom.dispose();
-    });
 
     test('nested atomicUpdate flushes only on outermost exit', () {
       final atom = Atom<int>(0, autoDispose: false);
