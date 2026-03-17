@@ -12,4 +12,5 @@ export 'src/core.dart';
 export 'src/debug.dart';
 export 'src/devtools_service.dart';
 export 'src/extensions.dart';
+export 'src/mixins/watch_mixin.dart';
 export 'src/widgets.dart';
