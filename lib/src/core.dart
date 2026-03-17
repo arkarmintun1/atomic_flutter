@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 
 import 'package:atomic_flutter/src/debug.dart';
 import 'package:atomic_flutter/src/middleware.dart';
@@ -37,6 +38,10 @@ class Atom<T> {
 
   // Global middleware applied to every atom's set() call
   static final List<AtomMiddleware> _globalMiddleware = [];
+
+  // Global batch state — atoms modified during a batch defer notifications
+  static bool _globalBatching = false;
+  static final LinkedHashSet<Atom> _globalDirtyAtoms = LinkedHashSet();
 
   /// Register [middleware] globally — it will be called for every atom.
   ///
@@ -181,6 +186,11 @@ class Atom<T> {
   void _notifyListeners() {
     if (_isBatching) {
       _isDirty = true;
+      return;
+    }
+
+    if (Atom._globalBatching) {
+      Atom._globalDirtyAtoms.add(this);
       return;
     }
 
@@ -445,6 +455,43 @@ Atom<R> computed<R>(
   }
 
   return derivedAtom;
+}
+
+/// Update multiple atoms in a single batch — listeners are notified only
+/// after all updates in [updates] have completed.
+///
+/// Without this, each `set()` immediately notifies listeners, causing one
+/// rebuild per atom. With `atomicUpdate`, a widget that depends on several
+/// atoms rebuilds exactly once after the batch finishes.
+///
+/// ```dart
+/// atomicUpdate(() {
+///   counterAtom.set(5);
+///   nameAtom.set('Alice');
+///   cartAtom.clear();
+/// });
+/// ```
+///
+/// Throws if [updates] throws — dirty atoms are not flushed in that case,
+/// leaving state as it was before the failed updates.
+void atomicUpdate(void Function() updates) {
+  Atom._globalBatching = true;
+  try {
+    updates();
+  } catch (_) {
+    // Discard any pending notifications from the failed batch
+    Atom._globalDirtyAtoms.clear();
+    Atom._globalBatching = false;
+    rethrow;
+  }
+  Atom._globalBatching = false;
+
+  // Flush dirty atoms in insertion order (first modified = first notified)
+  final dirty = List<Atom>.of(Atom._globalDirtyAtoms);
+  Atom._globalDirtyAtoms.clear();
+  for (final atom in dirty) {
+    atom._notifyListeners();
+  }
 }
 
 /// Returns the dependency path from [source] to [target] if one exists,

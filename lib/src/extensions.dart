@@ -302,9 +302,8 @@ extension AtomExtensions<T> on Atom<T> {
   }
 }
 
-/// Batch multiple atom updates together
-void batchAtomUpdates(void Function() updates) {
-  // Simple implementation - could be enhanced with global batching
-  updates();
-}
+/// Batch multiple atom updates together.
+///
+/// Alias for [atomicUpdate]. Prefer [atomicUpdate] for new code.
+void batchAtomUpdates(void Function() updates) => atomicUpdate(updates);
 
