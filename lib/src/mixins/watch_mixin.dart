@@ -37,6 +37,12 @@ mixin WatchAtom<T extends StatefulWidget> on State<T> {
   /// the atom's value changes. Atoms not watched in a given build are
   /// unsubscribed after the frame completes.
   V watch<V>(Atom<V> atom) {
+    assert(
+      SchedulerBinding.instance.schedulerPhase ==
+          SchedulerPhase.persistentCallbacks,
+      'watch() was called outside of build().\n'
+      'Only call watch() directly inside the build() method of your State.',
+    );
     _watching.add(atom);
 
     if (!_subscriptions.containsKey(atom)) {

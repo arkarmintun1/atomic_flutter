@@ -229,5 +229,55 @@ void main() {
       atom.removeListener(externalListener);
       atom.dispose();
     });
+
+    testWidgets('asserts when watch() is called outside build()',
+        (tester) async {
+      final atom = Atom<int>(0, autoDispose: false);
+      late _ExposingWidgetState capturedState;
+
+      // Widget that exposes its state so we can call watch() from outside build
+      final widget = _ExposingWidget(
+        atom: atom,
+        onStateCreated: (state) => capturedState = state,
+      );
+
+      await tester.pumpWidget(MaterialApp(home: widget));
+
+      // Calling watch() from an event handler (outside build) must assert
+      expect(
+        () => capturedState.watch(atom),
+        throwsA(isA<AssertionError>()),
+      );
+
+      atom.dispose();
+    });
   });
+}
+
+// ---------------------------------------------------------------------------
+// Helper widget that exposes its state for the assertion test
+// ---------------------------------------------------------------------------
+
+class _ExposingWidget extends StatefulWidget {
+  final Atom<int> atom;
+  final void Function(_ExposingWidgetState state) onStateCreated;
+  const _ExposingWidget(
+      {required this.atom, required this.onStateCreated});
+
+  @override
+  State<_ExposingWidget> createState() => _ExposingWidgetState();
+}
+
+class _ExposingWidgetState extends State<_ExposingWidget> with WatchAtom {
+  @override
+  void initState() {
+    super.initState();
+    widget.onStateCreated(this);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    watch(widget.atom);
+    return const SizedBox();
+  }
 }
