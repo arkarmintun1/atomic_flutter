@@ -81,15 +81,72 @@ void main() {
     });
 
     group('select', () {
-      test('should create AtomSelector widget', () {
-        final atom = Atom<Map<String, int>>({'count': 5});
+      test('should return a focused atom from a slice', () {
+        final atom = Atom<Map<String, int>>({'count': 5, 'other': 99});
+        final countAtom = atom.select<int>((data) => data['count']!);
 
-        final widget = atom.select<int>(
-          selector: (data) => data['count']!,
-          builder: (context, count) => Text('$count'),
+        expect(countAtom, isA<Atom<int>>());
+        expect(countAtom.value, 5);
+      });
+
+      test('should update when selected slice changes', () async {
+        final atom = Atom<Map<String, int>>({'count': 5, 'other': 99});
+        final countAtom = atom.select<int>((data) => data['count']!);
+        final received = <int>[];
+        countAtom.addListener(received.add);
+
+        atom.set({'count': 10, 'other': 99});
+        expect(received, [10]);
+      });
+
+      test('should not update when unselected field changes', () async {
+        final atom = Atom<Map<String, int>>({'count': 5, 'other': 99});
+        final countAtom = atom.select<int>((data) => data['count']!);
+        final received = <int>[];
+        countAtom.addListener(received.add);
+
+        atom.set({'count': 5, 'other': 42}); // count unchanged
+        expect(received, isEmpty);
+      });
+
+      test('should respect custom equals', () {
+        final atom = Atom<List<int>>([1, 2, 3]);
+        final lengthAtom = atom.select(
+          (list) => list.length,
+          equals: (a, b) => a == b,
+        );
+        final received = <int>[];
+        lengthAtom.addListener(received.add);
+
+        atom.set([4, 5, 6]); // same length → no notification
+        expect(received, isEmpty);
+
+        atom.set([1, 2]); // different length → notification
+        expect(received, [2]);
+      });
+
+      test('should be usable as computed dependency', () {
+        final userAtom = Atom<Map<String, String>>(
+          {'name': 'Alice', 'role': 'admin'},
+        );
+        final nameAtom = userAtom.select((u) => u['name']!);
+        final greeting = computed(
+          () => 'Hello, ${nameAtom.value}!',
+          tracked: [nameAtom],
         );
 
-        expect(widget, isA<AtomSelector<Map<String, int>, int>>());
+        expect(greeting.value, 'Hello, Alice!');
+        userAtom.set({'name': 'Bob', 'role': 'admin'});
+        expect(greeting.value, 'Hello, Bob!');
+      });
+
+      test('should clean up listener when selected atom is disposed', () {
+        final atom = Atom<int>(0, autoDispose: false);
+        final selected = atom.select((v) => v * 2);
+        expect(atom.listenerCount, 1);
+
+        selected.dispose();
+        expect(atom.listenerCount, 0);
       });
     });
 

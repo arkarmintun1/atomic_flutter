@@ -1,7 +1,7 @@
 import 'dart:async';
+
 import 'package:atomic_flutter/src/core.dart';
-import 'package:atomic_flutter/src/widgets.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/foundation.dart';
 
 /// Extension methods for Atom class
 extension AtomExtensions<T> on Atom<T> {
@@ -12,14 +12,16 @@ extension AtomExtensions<T> on Atom<T> {
   /// and then again whenever the value changes.
   ///
   /// Returns a function that can be called to stop the effect.
-  VoidCallback effect(void Function(T value) effect,
-      {bool runImmediately = false}) {
+  VoidCallback effect(
+    void Function(T value) fn, {
+    bool runImmediately = true,
+  }) {
     if (runImmediately) {
-      effect(value); // Run immediately if specified
+      fn(value);
     }
-    addListener(effect); // Run on future changes
+    addListener(fn);
 
-    return () => removeListener(effect);
+    return () => removeListener(fn);
   }
 
   /// Convert atom to a Stream
@@ -64,22 +66,49 @@ extension AtomExtensions<T> on Atom<T> {
     return controller.stream;
   }
 
-  /// Create a widget that only rebuilds when a specific part changes
+  /// Derive a focused atom from a slice of this atom's state.
   ///
-  /// This is more efficient than using AtomBuilder when you only
-  /// care about a specific part of a complex state object.
+  /// The returned atom only updates when the selected value actually changes,
+  /// making it efficient for large state objects where only part of the state
+  /// is relevant to a given widget or computation.
   ///
-  /// [selector]: Function that selects a part of the atom's value
-  /// [builder]: Builder function that receives the selected value
-  Widget select<S>({
-    required S Function(T state) selector,
-    required Widget Function(BuildContext context, S selectedValue) builder,
+  /// ```dart
+  /// final userAtom = Atom<User>(User(name: 'Alice', role: 'admin'));
+  ///
+  /// final nameAtom = userAtom.select((u) => u.name);
+  /// final roleAtom = userAtom.select((u) => u.role);
+  ///
+  /// // nameAtom only updates when u.name changes — role updates are ignored
+  /// AtomBuilder(atom: nameAtom, builder: (ctx, name) => Text(name));
+  ///
+  /// // Composable with other extensions
+  /// final greeting = computed(
+  ///   () => 'Hello, ${nameAtom.value}!',
+  ///   tracked: [nameAtom],
+  /// );
+  /// ```
+  ///
+  /// [selector]: Function that picks a slice of the atom's value
+  /// [equals]: Optional custom equality for the selected value
+  Atom<S> select<S>(
+    S Function(T state) selector, {
+    bool Function(S, S)? equals,
   }) {
-    return AtomSelector<T, S>(
-      atom: this,
-      selector: selector,
-      builder: builder,
+    final selectedAtom = Atom<S>(
+      selector(value),
+      equals: equals,
+      autoDispose: true,
     );
+
+    void listener(T newValue) {
+      selectedAtom.set(selector(newValue));
+    }
+
+    addListener(listener);
+    selectedAtom.onDispose(() => removeListener(listener));
+    onDispose(() => selectedAtom.dispose());
+
+    return selectedAtom;
   }
 
   /// Debounce updates to this atom

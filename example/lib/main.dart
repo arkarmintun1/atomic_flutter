@@ -1,6 +1,7 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
 import 'package:atomic_flutter/atomic_flutter.dart';
+import 'package:flutter/material.dart';
 
 ///=============================================================================
 /// ENHANCED ATOMIC_FLUTTER EXAMPLE
@@ -60,7 +61,9 @@ class Cart {
 
   Cart addItem(CartItem item) {
     final updatedItems = List<CartItem>.from(items);
-    final index = updatedItems.indexWhere((i) => i.product.id == item.product.id);
+    final index = updatedItems.indexWhere(
+      (i) => i.product.id == item.product.id,
+    );
     if (index >= 0) {
       final existing = updatedItems[index];
       updatedItems[index] = CartItem(
@@ -74,12 +77,15 @@ class Cart {
   }
 
   Cart removeItem(int productId) {
-    return Cart(items: items.where((item) => item.product.id != productId).toList());
+    return Cart(
+      items: items.where((item) => item.product.id != productId).toList(),
+    );
   }
 
   @override
   bool operator ==(Object other) =>
-      identical(this, other) || other is Cart && items.length == other.items.length;
+      identical(this, other) ||
+      other is Cart && items.length == other.items.length;
 
   @override
   int get hashCode => items.fold(0, (hash, item) => hash ^ item.hashCode);
@@ -95,7 +101,9 @@ class CartItem {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is CartItem && product == other.product && quantity == other.quantity;
+      other is CartItem &&
+          product == other.product &&
+          quantity == other.quantity;
 
   @override
   int get hashCode => product.hashCode ^ quantity.hashCode;
@@ -173,7 +181,12 @@ class ApiService {
   Future<User> login(String email, String password) async {
     await Future.delayed(const Duration(seconds: 1));
     if (password.isEmpty) throw Exception('Invalid credentials');
-    return User(id: 1, email: email, name: email.split('@').first, isVerified: true);
+    return User(
+      id: 1,
+      email: email,
+      name: email.split('@').first,
+      isVerified: true,
+    );
   }
 
   Future<Cart> saveCart(Cart cart) async {
@@ -230,7 +243,9 @@ class CartAtom extends Atom<Cart> {
   CartAtom(this._api) : super(const Cart(), id: 'cart', autoDispose: false);
 
   void addProduct(Product product, int quantity) {
-    update((cart) => cart.addItem(CartItem(product: product, quantity: quantity)));
+    update(
+      (cart) => cart.addItem(CartItem(product: product, quantity: quantity)),
+    );
     // SHOWCASE: Optimistic update - save to backend after UI update
     _saveToBackend();
   }
@@ -256,7 +271,10 @@ class ThemeAtom extends Atom<ThemeMode> {
   ThemeAtom() : super(ThemeMode.system, id: 'theme', autoDispose: false);
 
   void toggle() {
-    update((current) => current == ThemeMode.light ? ThemeMode.dark : ThemeMode.light);
+    update(
+      (current) =>
+          current == ThemeMode.light ? ThemeMode.dark : ThemeMode.light,
+    );
   }
 
   bool get isDark => value == ThemeMode.dark;
@@ -482,7 +500,11 @@ class _EnhancedProductListTabState extends State<EnhancedProductListTab> {
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const Icon(
+                      Icons.error_outline,
+                      size: 64,
+                      color: Colors.red,
+                    ),
                     const SizedBox(height: 16),
                     Text('Error: $error'),
                     const SizedBox(height: 16),
@@ -493,7 +515,8 @@ class _EnhancedProductListTabState extends State<EnhancedProductListTab> {
                     ),
                     const SizedBox(height: 8),
                     TextButton(
-                      onPressed: () => productsAsyncAtom.loadProductsWithRetry(),
+                      onPressed: () =>
+                          productsAsyncAtom.loadProductsWithRetry(),
                       child: const Text('Retry with exponential backoff'),
                     ),
                   ],
@@ -590,10 +613,11 @@ class EnhancedCartTab extends StatelessWidget {
       ),
       body: Column(
         children: [
-          // SHOWCASE: AtomSelector - only rebuilds when items change
+          // SHOWCASE: AtomSelector() - only rebuilds when items change
           Expanded(
-            child: cartAtom.select<List<CartItem>>(
-              selector: (cart) => cart.items,
+            child: AtomSelector(
+              atom: cartAtom,
+              selector: (atom) => atom.items,
               builder: (context, items) {
                 if (items.isEmpty) {
                   return const Center(child: Text('Cart is empty'));
@@ -610,9 +634,9 @@ class EnhancedCartTab extends StatelessWidget {
             ),
           ),
 
-          // SHOWCASE: AtomSelector - only rebuilds when total changes
-          cartAtom.select<double>(
-            selector: (cart) => cart.totalPrice,
+          // SHOWCASE: select() - only rebuilds when total changes
+          AtomBuilder(
+            atom: cartAtom.select((cart) => cart.totalPrice),
             builder: (context, total) {
               return Container(
                 padding: const EdgeInsets.all(16),
@@ -648,7 +672,9 @@ class EnhancedCartTab extends StatelessWidget {
                           onPressed: total > 0
                               ? () {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(content: Text('Order placed!')),
+                                    const SnackBar(
+                                      content: Text('Order placed!'),
+                                    ),
                                   );
                                   cartAtom.clear();
                                 }
@@ -710,8 +736,10 @@ class FeaturesShowcaseTab extends StatefulWidget {
 class _FeaturesShowcaseTabState extends State<FeaturesShowcaseTab> {
   // Demo atoms for showcasing
   final counterAtom = Atom<int>(0, id: 'counter');
-  late final debouncedCounter = counterAtom.debounce(const Duration(seconds: 1));
-  late final throttledCounter = counterAtom.throttle(const Duration(seconds: 1));
+  late final debouncedCounter =
+      counterAtom.debounce(const Duration(seconds: 1));
+  late final throttledCounter =
+      counterAtom.throttle(const Duration(seconds: 1));
   late final doubledCounter = counterAtom.map((value) => value * 2);
   late final evenOnlyCounter = counterAtom.where((value) => value % 2 == 0);
 
@@ -791,7 +819,8 @@ class _FeaturesShowcaseTabState extends State<FeaturesShowcaseTab> {
                 AsyncAtomBuilder<int>(
                   atom: asyncCounterAtom,
                   idle: (context) => const Text('Idle - Click button to load'),
-                  loading: (context, previousData) => const CircularProgressIndicator(),
+                  loading: (context, previousData) =>
+                      const CircularProgressIndicator(),
                   success: (context, data) => Text('Success: $data'),
                   error: (context, error, stack, data) => Text('Error: $error'),
                 ),
@@ -822,7 +851,10 @@ class _FeaturesShowcaseTabState extends State<FeaturesShowcaseTab> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(title, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+        Text(
+          title,
+          style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
         ...children,
       ],
@@ -838,7 +870,10 @@ class _FeaturesShowcaseTabState extends State<FeaturesShowcaseTab> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
-            Text(description, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+            Text(
+              description,
+              style: TextStyle(color: Colors.grey[600], fontSize: 12),
+            ),
             const SizedBox(height: 8),
             demo,
           ],
