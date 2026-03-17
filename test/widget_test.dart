@@ -283,6 +283,42 @@ void main() {
       // Clean up
       atom.dispose();
     });
+
+    testWidgets('should use custom equals to suppress rebuild', (tester) async {
+      final atom = Atom<List<int>>([1, 2, 3], autoDispose: false);
+      int buildCount = 0;
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AtomSelector<List<int>, int>(
+            atom: atom,
+            selector: (list) => list.length,
+            // treat lengths within 1 of each other as equal
+            equals: (a, b) => (a - b).abs() <= 1,
+            builder: (context, len) {
+              buildCount++;
+              return Text('Len: $len');
+            },
+          ),
+        ),
+      );
+
+      expect(buildCount, 1);
+
+      // Length goes from 3 to 4 — within tolerance, should NOT rebuild
+      atom.set([1, 2, 3, 4]);
+      await tester.pump();
+      expect(buildCount, 1);
+
+      // Length goes from 4 to 10 — outside tolerance, should rebuild
+      atom.set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      await tester.pump();
+      expect(buildCount, 2);
+      expect(find.text('Len: 10'), findsOneWidget);
+
+      // Clean up
+      atom.dispose();
+    });
   });
 
   group('MultiAtomBuilder Tests', () {

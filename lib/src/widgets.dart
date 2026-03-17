@@ -180,16 +180,23 @@ class AtomSelector<T, S> extends StatefulWidget {
   /// Builder function that receives the selected value
   final Widget Function(BuildContext context, S selectedValue) builder;
 
+  /// Optional custom equality for the selected value.
+  ///
+  /// Defaults to `==` when null.
+  final bool Function(S, S)? equals;
+
   /// Creates an AtomSelector widget
   ///
   /// [atom]: The atom to subscribe to
   /// [selector]: Function that selects a part of the atom's value
   /// [builder]: Builder function that receives the selected value
+  /// [equals]: Optional custom equality for the selected value
   const AtomSelector({
     super.key,
     required this.atom,
     required this.selector,
     required this.builder,
+    this.equals,
   });
 
   @override
@@ -224,7 +231,10 @@ class _AtomSelectorState<T, S> extends State<AtomSelector<T, S>> {
 
   void _onStateChanged(T value) {
     final newSelectedValue = widget.selector(value);
-    if (newSelectedValue != selectedValue) {
+    final isEqual = widget.equals != null
+        ? widget.equals!(selectedValue, newSelectedValue)
+        : selectedValue == newSelectedValue;
+    if (!isEqual) {
       setState(() {
         selectedValue = newSelectedValue;
       });
