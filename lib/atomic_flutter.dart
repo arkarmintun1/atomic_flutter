@@ -7,6 +7,7 @@ library;
 
 export 'src/async_atom.dart';
 export 'src/history.dart';
+export 'src/persist.dart';
 export 'src/middleware.dart';
 export 'src/async_extensions.dart';
 export 'src/async_widget.dart';
