@@ -308,9 +308,3 @@ void batchAtomUpdates(void Function() updates) {
   updates();
 }
 
-/// Create multiple atoms at once
-Map<String, Atom<T>> createAtoms<T>(Map<String, T> initialValues) {
-  return initialValues.map(
-    (key, value) => MapEntry(key, Atom<T>(value, id: key)),
-  );
-}

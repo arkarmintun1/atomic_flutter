@@ -629,21 +629,5 @@ void main() {
       expect(values, [10, 20]);
     });
 
-    test('createAtoms should create multiple atoms', () {
-      final atoms = createAtoms<String>({
-        'name': 'John',
-        'email': 'john@example.com',
-        'city': 'New York',
-      });
-
-      expect(atoms.length, 3);
-      expect(atoms['name']?.value, 'John');
-      expect(atoms['email']?.value, 'john@example.com');
-      expect(atoms['city']?.value, 'New York');
-
-      expect(atoms['name']?.id, 'name');
-      expect(atoms['email']?.id, 'email');
-      expect(atoms['city']?.id, 'city');
-    });
   });
 }
