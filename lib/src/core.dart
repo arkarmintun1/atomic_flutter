@@ -1,7 +1,12 @@
 import 'dart:async';
 
 import 'package:atomic_flutter/src/debug.dart';
+import 'package:atomic_flutter/src/middleware.dart';
 import 'package:flutter/widgets.dart';
+
+/// Per-atom value transformer. Receives the old and proposed new value,
+/// returns the value to actually store. Return [oldValue] to block the update.
+typedef AtomTransformer<T> = T Function(T oldValue, T newValue);
 
 /// A single atomic unit of state
 class Atom<T> {
@@ -23,9 +28,30 @@ class Atom<T> {
   // Dispose callback for cleanup
   final List<VoidCallback> _disposeCallbacks = [];
 
+  // Per-atom middleware transformers
+  final List<AtomTransformer<T>> _localMiddleware;
+
   // Static configuration
   static Duration defaultDisposeTimeout = const Duration(minutes: 2);
   static bool debugMode = false;
+
+  // Global middleware applied to every atom's set() call
+  static final List<AtomMiddleware> _globalMiddleware = [];
+
+  /// Register [middleware] globally — it will be called for every atom.
+  ///
+  /// ```dart
+  /// Atom.addMiddleware(const LoggingMiddleware());
+  /// ```
+  static void addMiddleware(AtomMiddleware middleware) =>
+      _globalMiddleware.add(middleware);
+
+  /// Remove a previously registered global [middleware].
+  static void removeMiddleware(AtomMiddleware middleware) =>
+      _globalMiddleware.remove(middleware);
+
+  /// Remove all global middleware. Useful in tests.
+  static void clearMiddleware() => _globalMiddleware.clear();
 
   /// Create a new atom with initial value
   ///
@@ -48,10 +74,12 @@ class Atom<T> {
     bool autoDispose = true,
     Duration? disposeTimeout,
     bool Function(T, T)? equals,
+    List<AtomTransformer<T>>? middleware,
   })  : _id = id ?? 'atom_${identityHashCode(_value)}',
         _autoDispose = autoDispose,
         _disposeTimeout = disposeTimeout,
-        _equals = equals {
+        _equals = equals,
+        _localMiddleware = middleware ?? const [] {
     if (debugMode) {
       AtomDebugger.register(this);
     }
@@ -107,12 +135,28 @@ class Atom<T> {
   /// Debug-only: Number of listeners attached to this atom.
   int get listenerCount => _listeners.length;
 
-  /// Update the atom value with explicit mutation
+  /// Update the atom value with explicit mutation.
   ///
-  /// This will notify all listeners if the value actually changes.
-  /// Uses the custom [equals] function if provided, otherwise falls back to
-  /// identity check (`identical`) and then `==`.
+  /// Runs all registered middleware (per-atom transformers first, then global)
+  /// before storing the value. Listeners are only notified if the value
+  /// actually changes (using the custom [equals] function if provided,
+  /// otherwise falling back to `identical` + `==`).
   void set(T newValue) {
+    T result = newValue;
+    for (final t in _localMiddleware) {
+      result = t(_value, result);
+    }
+    for (final mw in Atom._globalMiddleware) {
+      result = mw.onSet(this, _value, result);
+    }
+    _setDirect(result);
+  }
+
+  /// Stores [newValue] and notifies listeners, bypassing middleware.
+  ///
+  /// Used internally by computed atoms and async state transitions where
+  /// the value is derived by the framework, not driven by user code.
+  void _setDirect(T newValue) {
     final isEqual = _equals != null
         ? _equals(_value, newValue)
         : (identical(_value, newValue) || _value == newValue);
@@ -332,13 +376,7 @@ class _ComputedAtom<T> extends Atom<T> {
   });
 
   void _computeValue() {
-    final newValue = _computeFunction();
-    final isEqual = _equals != null
-        ? _equals(_value, newValue)
-        : (identical(_value, newValue) || _value == newValue);
-    if (!isEqual) {
-      super.set(newValue); // Use super.set to bypass override
-    }
+    _setDirect(_computeFunction());
   }
 
   @override
