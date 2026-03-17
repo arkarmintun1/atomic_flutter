@@ -40,7 +40,8 @@ class Atom<T> {
   static final List<AtomMiddleware> _globalMiddleware = [];
 
   // Global batch state — atoms modified during a batch defer notifications
-  static bool _globalBatching = false;
+  static int _globalBatchDepth = 0;
+  static bool get _globalBatching => _globalBatchDepth > 0;
   static final LinkedHashSet<Atom> _globalDirtyAtoms = LinkedHashSet();
 
   /// Register [middleware] globally — it will be called for every atom.
@@ -223,7 +224,9 @@ class Atom<T> {
     }
 
     // Then notify UI listeners with error handling
-    for (final listener in _listeners) {
+    // Snapshot the set so listeners that remove themselves mid-iteration
+    // don't cause a ConcurrentModificationError.
+    for (final listener in List.of(_listeners)) {
       try {
         listener._notify(_value);
       } catch (e, stackTrace) {
@@ -475,16 +478,21 @@ Atom<R> computed<R>(
 /// Throws if [updates] throws — dirty atoms are not flushed in that case,
 /// leaving state as it was before the failed updates.
 void atomicUpdate(void Function() updates) {
-  Atom._globalBatching = true;
+  Atom._globalBatchDepth++;
   try {
     updates();
   } catch (_) {
-    // Discard any pending notifications from the failed batch
-    Atom._globalDirtyAtoms.clear();
-    Atom._globalBatching = false;
+    Atom._globalBatchDepth--;
+    // Only discard pending notifications if this is the outermost batch
+    if (Atom._globalBatchDepth == 0) {
+      Atom._globalDirtyAtoms.clear();
+    }
     rethrow;
   }
-  Atom._globalBatching = false;
+  Atom._globalBatchDepth--;
+
+  // Only flush when the outermost batch completes
+  if (Atom._globalBatchDepth > 0) return;
 
   // Flush dirty atoms in insertion order (first modified = first notified)
   final dirty = List<Atom>.of(Atom._globalDirtyAtoms);

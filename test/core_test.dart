@@ -769,5 +769,26 @@ void main() {
       atom.set(6); // different value
       expect(notificationCount, 1);
     });
+
+    test('listener that removes itself during notification does not throw', () {
+      final atom = Atom<int>(0, autoDispose: false);
+      int calls = 0;
+
+      late void Function(int) selfRemovingListener;
+      selfRemovingListener = (_) {
+        calls++;
+        atom.removeListener(selfRemovingListener);
+      };
+
+      atom.addListener(selfRemovingListener);
+      expect(() => atom.set(1), returnsNormally);
+      expect(calls, 1);
+
+      // Listener was removed — second set should not call it
+      atom.set(2);
+      expect(calls, 1);
+
+      atom.dispose();
+    });
   });
 }

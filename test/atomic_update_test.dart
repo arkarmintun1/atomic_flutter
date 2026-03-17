@@ -119,18 +119,16 @@ void main() {
       int calls = 0;
       atom.addListener((_) => calls++);
 
-      // Dart is single-threaded so inner atomicUpdate will set _globalBatching
-      // to false and flush — nested batching is a known limitation.
-      // This test documents current behaviour.
       atomicUpdate(() {
         atom.set(1);
-        // Inner batch: flushes immediately when it exits
         atomicUpdate(() {
           atom.set(2);
         });
         atom.set(3);
       });
 
+      // Listener fires exactly once after the outermost batch completes
+      expect(calls, 1);
       expect(atom.value, 3);
 
       atom.dispose();
