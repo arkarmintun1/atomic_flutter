@@ -4,6 +4,41 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-03-18
+
+### Added
+
+- **`WatchAtom` mixin** — subscribe to atoms directly inside `build()` with no `AtomBuilder` wrapper; subscriptions are reconciled automatically after each frame
+- **`AtomMiddleware`** — intercept and transform values on every `set()` call; supports global middleware (`Atom.addMiddleware`) and per-atom transformers via the `middleware` constructor parameter
+- **`LoggingMiddleware`** — built-in middleware that logs every state change in debug mode at zero cost in release builds
+- **`atomicUpdate()`** — defers all listener notifications until every atom in the block has been updated; nested calls are fully supported via a depth counter
+- **`AtomHistory<T>`** — wraps any `Atom<T>` with a bounded undo/redo stack backed by a fixed-capacity ring buffer; `canUndo` and `canRedo` exposed as `Atom<bool>` for reactive UI
+- **`persistAtom()`** — creates an atom whose value is automatically saved to and restored from any `AtomStorage` backend
+- **`AtomStorage`** — storage abstraction with `read` / `write` / `delete`; implement for any key-value store (SharedPreferences, Hive, etc.)
+- **`InMemoryAtomStorage`** — in-memory `AtomStorage` implementation for tests
+- **Custom `equals` on `AtomSelector`** — prevents rebuilds when a custom equality function says the selected value has not changed
+
+### Changed
+
+- **`AtomBuilder` builder signature** now includes an optional `child` parameter: `Widget Function(BuildContext, T, Widget?)` — allows passing a static sub-tree that is not rebuilt on atom changes
+- **`AsyncAtomBuilder`** is now the single async widget — `AsyncBuilder` has been removed; providing `operation` enables both pull-to-refresh and a retry button with no extra flags
+- **`select()` extension** now returns `Atom<S>` (a derived atom) instead of a widget
+- **`atomicUpdate()`** replaces `batchAtomUpdates` — the old function has been removed
+- **`_globalBatching`** replaced by `_globalBatchDepth` counter so nested `atomicUpdate` calls flush only when the outermost block exits
+- **`_isBatching`** replaced by `_batchDepth` counter on `Atom` so nested `batch()` calls on the same atom flush only when the outermost call exits
+
+### Fixed
+
+- `_notifyListeners` now snapshots the listener set before iterating, preventing `ConcurrentModificationError` when a listener removes itself during notification
+- Duplicate atoms in `MultiAtomBuilder`'s atom list no longer register multiple listeners, preventing a listener leak
+- `select()` listener now wraps the selector call in a try-catch, consistent with `map()` and `where()`
+
+### Removed
+
+- `AtomConsumer` — use `AtomBuilder` instead
+- `AsyncBuilder` — use `AsyncAtomBuilder` instead
+- `batchAtomUpdates` — use `atomicUpdate` instead
+
 ## [0.4.1] - 2026-03-17
 
 ### Fixed
