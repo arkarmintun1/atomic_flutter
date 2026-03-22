@@ -4,6 +4,36 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-03-22
+
+### Fixed
+
+- **`atomicUpdate()` rollback** — atoms now restore their previous values when an error is thrown inside the update block, preventing inconsistent state
+- **`AsyncValue.hasValue`** — correctly returns `true` for nullable success types with `null` data
+- **`AsyncValue.value`** — uses safe `as T` cast instead of `!` to support nullable type parameters
+- **`AsyncAtom.cancel()` / `clear()`** — bypass middleware via `setDirect()` to avoid unintended side effects
+- **`asStream()`** — changed to single-subscription `StreamController` with lazy listener setup, preventing resource leaks
+- **`select()`** — now delegates to `computed()` for proper read-only semantics
+- **`throttle()`** — added trailing-edge emission so the last value in a throttle window is never lost
+- **`combine()`** — `onDispose` callbacks now return removal functions; each source properly cleans up the other on disposal
+- **`persistAtom()` race condition** — user `set()` calls during async storage restore now take priority over the persisted value; restored values no longer trigger a redundant write-back
+- **`WatchAtom` mixin** — fixed subscription tracking so `_watching` is cleared on the first `watch()` of each build pass instead of inside the listener
+- **`executeWithRetry()`** — checks `isDisposed` after each retry delay to stop retrying disposed atoms
+- **`AtomFamily.call()`** — auto-removes disposed atoms from the internal map and returns a fresh instance
+- **`AtomFamily.dispose()`** — snapshots the map before iterating to prevent `ConcurrentModificationError`
+- **`AtomHistory` lint** — replaced `!` with `as T` casts on nullable type parameters to fix `null_check_on_nullable_type_parameter`
+- **`MultiAtomBuilder` equality** — `_listsEqual` now handles lists of different lengths correctly
+- **Example app** — fixed `AsyncBuilder` → `AsyncAtomBuilder`, wrong `success:` parameter name, and `select()` leak in `build()`
+- **CI analysis** — excluded `devtools_extension/` from `flutter analyze` to prevent false failures from its unresolved dependencies
+
+### Added
+
+- **`Atom.setDirect()`** — `@protected` method for cross-library access to bypass middleware
+- **`Atom.onDispose()` removal** — now returns a `VoidCallback` to unregister the callback; runs immediately if atom is already disposed
+- **CI workflow** — GitHub Actions workflow for `flutter analyze` and `flutter test` on push/PR to `main`
+- **README badge** — test status badge
+- **New tests** — `onDispose` removal, `AtomFamily` auto-cleanup, `atomicUpdate` rollback, `AsyncValue.hasValue` for nullable types, `persistAtom` race conditions, throttle trailing edge, and more
+
 ## [0.5.0] - 2026-03-18
 
 ### Added

@@ -62,7 +62,7 @@ AtomicFlutter is a lightweight, reactive state management solution for Flutter a
 
 ```yaml
 dependencies:
-  atomic_flutter: ^0.5.0
+  atomic_flutter: ^0.5.1
 ```
 
 ```dart
