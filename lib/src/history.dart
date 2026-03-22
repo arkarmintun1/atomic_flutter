@@ -63,8 +63,9 @@ class AtomHistory<T> {
   /// Restore the previous value.
   void undo() {
     if (_undoStack.length <= 1) return;
-    _redoStack.add(_undoStack.pop()!);
-    _apply(_undoStack.peek()!);
+    final current = _undoStack.pop() as T;
+    _redoStack.add(current);
+    _apply(_undoStack.peek() as T);
   }
 
   /// Re-apply a value that was undone.

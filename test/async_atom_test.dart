@@ -118,6 +118,16 @@ void main() {
       expect(value1.hashCode, equals(value2.hashCode));
     });
 
+    test('error states should always compare unequal', () {
+      final error = Exception('network timeout');
+      final stack = StackTrace.current;
+      final value1 = AsyncValue<int>.error(error, stack);
+      final value2 = AsyncValue<int>.error(error, stack);
+
+      // Even with same error, they should be unequal so retries trigger rebuilds
+      expect(value1, isNot(equals(value2)));
+    });
+
     test('should have proper toString', () {
       const asyncValue = AsyncValue<int>.success(42);
       final string = asyncValue.toString();
@@ -142,6 +152,58 @@ void main() {
 
       expect(asyncAtom.value.hasValue, true);
       expect(asyncAtom.value.value, 42);
+    });
+
+    test('should notify on repeated identical errors', () {
+      final atom = AsyncAtom<String>(autoDispose: false);
+      int notifyCount = 0;
+      atom.addListener((_) => notifyCount++);
+
+      final error = Exception('network timeout');
+      final stack = StackTrace.current;
+
+      atom.setError(error, stack);
+      expect(notifyCount, 1);
+
+      // Same error again (e.g. retry failed)
+      atom.setError(error, stack);
+      expect(notifyCount, 2); // Should still notify
+    });
+
+    test('should throw StateError when execute called on disposed atom', () {
+      final atom = AsyncAtom<String>(autoDispose: false);
+      atom.dispose();
+
+      expect(
+        () => atom.execute(() async => 'test'),
+        throwsStateError,
+      );
+    });
+
+    test('should not update state when disposed during async operation',
+        () async {
+      final atom = AsyncAtom<String>(autoDispose: false);
+
+      final future = atom.execute(() async {
+        await Future.delayed(Duration(milliseconds: 20));
+        return 'result';
+      });
+
+      // Dispose while operation is in flight
+      atom.dispose();
+
+      final result = await future;
+      expect(result, 'result'); // Future still completes
+      expect(atom.value.isLoading, false); // But state was not updated
+    });
+
+    test('hasValue should be true for nullable success with null data', () {
+      final atom = AsyncAtom<int?>(autoDispose: false);
+      atom.setData(null);
+
+      expect(atom.value.hasValue, true);
+      expect(atom.value.state, AsyncState.success);
+      expect(atom.value.data, isNull);
     });
 
     test('should execute async operation successfully', () async {
@@ -733,6 +795,40 @@ void main() {
       // Adding after dispose should not throw and atom should not update
       expect(() => controller.add(2), returnsNormally);
       controller.close();
+    });
+
+    test('should not update state when stream emits after dispose', () async {
+      final controller = StreamController<int>();
+      final atom = StreamAtom(controller.stream);
+
+      controller.add(1);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 1);
+
+      atom.dispose();
+
+      // Stream events after disposal should not update atom
+      controller.add(42);
+      await Future.delayed(Duration.zero);
+      expect(atom.value.value, 1); // Unchanged
+      expect(atom.isDisposed, true);
+
+      controller.close();
+    });
+
+    test('reconnect on disposed atom should be a no-op', () async {
+      final controller1 = StreamController<int>();
+      final controller2 = StreamController<int>();
+      final atom = StreamAtom(controller1.stream);
+
+      atom.dispose();
+
+      // Should not throw or subscribe to new stream
+      atom.reconnect(controller2.stream);
+      expect(atom.isDisposed, true);
+
+      controller1.close();
+      controller2.close();
     });
   });
 }

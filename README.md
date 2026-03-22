@@ -5,6 +5,7 @@
 </p>
 
 [![pub package](https://img.shields.io/pub/v/atomic_flutter.svg)](https://pub.dev/packages/atomic_flutter)
+[![Tests](https://github.com/arkarmintun1/atomic_flutter/actions/workflows/tests.yml/badge.svg)](https://github.com/arkarmintun1/atomic_flutter/actions/workflows/tests.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 
 AtomicFlutter is a lightweight, reactive state management solution for Flutter applications. It provides a simple way to create, manage, and react to state changes with minimal boilerplate and maximum type safety.

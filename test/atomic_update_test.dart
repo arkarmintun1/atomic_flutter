@@ -107,8 +107,8 @@ void main() {
 
       // No notification fired
       expect(calls, 0);
-      // Value was committed (set() already ran before the throw)
-      expect(atom.value, 99);
+      // Value was rolled back to pre-batch state
+      expect(atom.value, 0);
 
       atom.dispose();
     });
@@ -132,6 +132,27 @@ void main() {
       expect(atom.value, 3);
 
       atom.dispose();
+    });
+
+    test('rolls back multiple atoms on error', () {
+      final a = Atom<int>(1, autoDispose: false);
+      final b = Atom<String>('hello', autoDispose: false);
+
+      expect(
+        () => atomicUpdate(() {
+          a.set(99);
+          b.set('world');
+          throw Exception('fail');
+        }),
+        throwsException,
+      );
+
+      // Both rolled back
+      expect(a.value, 1);
+      expect(b.value, 'hello');
+
+      a.dispose();
+      b.dispose();
     });
   });
 }

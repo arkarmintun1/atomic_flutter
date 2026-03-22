@@ -5,7 +5,7 @@ homepage: https://github.com/arkarmintun1/atomic_flutter
 
 environment:
   sdk: ^3.6.2
-  flutter: '>=1.17.0'
+  flutter: '>=3.0.0'
 
 dependencies:
   flutter:

@@ -98,22 +98,23 @@ Atom<T> persistAtom<T>(
     equals: equals,
   );
 
-  // Async load: read stored value and update atom if present.
-  storage.read(key).then((raw) {
-    if (raw == null) return;
-    try {
-      atom.set(fromJson(jsonDecode(raw)));
-    } catch (e) {
-      if (Atom.debugMode) {
-        print(
-          'AtomicFlutter [persistAtom]: Failed to restore "$key": $e',
-        );
-      }
-    }
-  });
+  // Track whether the initial load is still in progress and whether
+  // the user has called set() before it completes.
+  bool isRestoring = true;
+  bool userSetDuringRestore = false;
 
-  // Write back on every change.
+  // Write back on every change — but skip the write triggered by the
+  // initial restore to avoid a redundant round-trip.
+  bool skipNextWrite = false;
+
   void listener(T value) {
+    if (skipNextWrite) {
+      skipNextWrite = false;
+      return;
+    }
+    if (isRestoring) {
+      userSetDuringRestore = true;
+    }
     try {
       storage.write(key, jsonEncode(toJson(value)));
     } catch (e) {
@@ -127,6 +128,30 @@ Atom<T> persistAtom<T>(
 
   atom.addListener(listener);
   atom.onDispose(() => atom.removeListener(listener));
+
+  // Async load: read stored value and update atom if present.
+  // If the user called set() before this completes, skip the restore
+  // to avoid overwriting the user's value.
+  storage.read(key).then((raw) {
+    isRestoring = false;
+    if (raw == null) return;
+    if (userSetDuringRestore) return; // User value takes priority
+    if (atom.isDisposed) return;
+    try {
+      skipNextWrite = true;
+      atom.set(fromJson(jsonDecode(raw)));
+      // If the value was identical (no change), skipNextWrite was never
+      // consumed by the listener, so reset it.
+      skipNextWrite = false;
+    } catch (e) {
+      skipNextWrite = false;
+      if (Atom.debugMode) {
+        print(
+          'AtomicFlutter [persistAtom]: Failed to restore "$key": $e',
+        );
+      }
+    }
+  });
 
   return atom;
 }

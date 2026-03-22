@@ -29,36 +29,37 @@ extension AtomExtensions<T> on Atom<T> {
   /// The stream will emit the current value immediately,
   /// and then emit new values whenever the atom changes.
   Stream<T> asStream() {
-    final controller = StreamController<T>.broadcast();
+    late StreamController<T> controller;
+    late void Function(T) listener;
 
-    // Add current value asynchronously
-    scheduleMicrotask(() {
-      if (!controller.isClosed) {
-        controller.add(value);
-      }
-    });
+    controller = StreamController<T>(
+      onListen: () {
+        // Emit current value asynchronously once the subscriber is attached
+        scheduleMicrotask(() {
+          if (!controller.isClosed) {
+            controller.add(value);
+          }
+        });
 
-    // Setup listener
-    void listener(T value) {
-      if (!controller.isClosed) {
-        controller.add(value);
-      }
-    }
+        listener = (T value) {
+          if (!controller.isClosed) {
+            controller.add(value);
+          }
+        };
+        addListener(listener);
+      },
+      onCancel: () {
+        removeListener(listener);
+        if (!controller.isClosed) {
+          controller.close();
+        }
+      },
+    );
 
-    addListener(listener);
-
-    // Close controller when stream is cancelled
-    controller.onCancel = () {
-      removeListener(listener);
-      if (!controller.isClosed) {
-        controller.close();
-      }
-    };
-
-    // Also close controller when atom is disposed
+    // Close controller when atom is disposed
     onDispose(() {
-      removeListener(listener);
       if (!controller.isClosed) {
+        removeListener(listener);
         controller.close();
       }
     });
@@ -94,27 +95,12 @@ extension AtomExtensions<T> on Atom<T> {
     S Function(T state) selector, {
     bool Function(S, S)? equals,
   }) {
-    final selectedAtom = Atom<S>(
-      selector(value),
-      equals: equals,
+    return computed<S>(
+      () => selector(value),
+      tracked: [this],
       autoDispose: true,
+      equals: equals,
     );
-
-    void listener(T newValue) {
-      try {
-        selectedAtom.set(selector(newValue));
-      } catch (e) {
-        if (Atom.debugMode) {
-          print('AtomicFlutter: Selector error in atom $id: $e');
-        }
-      }
-    }
-
-    addListener(listener);
-    selectedAtom.onDispose(() => removeListener(listener));
-    onDispose(() => selectedAtom.dispose());
-
-    return selectedAtom;
   }
 
   /// Debounce updates to this atom
@@ -130,7 +116,9 @@ extension AtomExtensions<T> on Atom<T> {
     void listener(T newValue) {
       debounceTimer?.cancel();
       debounceTimer = Timer(duration, () {
-        debouncedAtom.set(newValue);
+        if (!debouncedAtom.isDisposed) {
+          debouncedAtom.set(newValue);
+        }
       });
     }
 
@@ -160,13 +148,33 @@ extension AtomExtensions<T> on Atom<T> {
   Atom<T> throttle(Duration duration) {
     final throttledAtom = Atom<T>(value, autoDispose: true);
     DateTime? lastUpdate;
+    Timer? trailingTimer;
+    T? pendingValue;
+    bool hasPending = false;
 
     void listener(T newValue) {
       try {
         final now = DateTime.now();
         if (lastUpdate == null || now.difference(lastUpdate!) >= duration) {
+          // Leading edge — emit immediately
           throttledAtom.set(newValue);
           lastUpdate = now;
+          hasPending = false;
+          trailingTimer?.cancel();
+          trailingTimer = null;
+        } else {
+          // Inside throttle window — queue trailing emission
+          pendingValue = newValue;
+          hasPending = true;
+          trailingTimer?.cancel();
+          final remaining = duration - now.difference(lastUpdate!);
+          trailingTimer = Timer(remaining, () {
+            if (hasPending && !throttledAtom.isDisposed) {
+              throttledAtom.set(pendingValue as T);
+              lastUpdate = DateTime.now();
+              hasPending = false;
+            }
+          });
         }
       } catch (e) {
         if (Atom.debugMode) {
@@ -179,11 +187,13 @@ extension AtomExtensions<T> on Atom<T> {
 
     // Cleanup when derived atom is disposed
     throttledAtom.onDispose(() {
+      trailingTimer?.cancel();
       removeListener(listener);
     });
 
     // Cleanup derived atom when source atom is disposed
     onDispose(() {
+      trailingTimer?.cancel();
       throttledAtom.dispose();
     });
 
@@ -284,12 +294,19 @@ extension AtomExtensions<T> on Atom<T> {
       other.removeListener(otherListener);
     });
 
-    // Cleanup combined atom when either source atom is disposed
-    onDispose(() {
+    // Cleanup combined atom when either source atom is disposed.
+    // Use removal functions to prevent the second source's callback from
+    // running after the combined atom is already disposed.
+    late final VoidCallback removeThisDispose;
+    late final VoidCallback removeOtherDispose;
+
+    removeThisDispose = onDispose(() {
+      removeOtherDispose();
       combinedAtom.dispose();
     });
 
-    other.onDispose(() {
+    removeOtherDispose = other.onDispose(() {
+      removeThisDispose();
       combinedAtom.dispose();
     });
 

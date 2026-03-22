@@ -18,7 +18,9 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
     void listener(AsyncValue<T> asyncValue) {
       debounceTimer?.cancel();
       debounceTimer = Timer(duration, () {
-        debouncedAtom.set(asyncValue);
+        if (!debouncedAtom.isDisposed) {
+          debouncedAtom.set(asyncValue);
+        }
       });
     }
 
@@ -70,13 +72,16 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
     return null;
   }
 
-  /// Execute with automatic retry on failure
+  /// Execute with automatic retry on failure.
   ///
   /// [maxRetries]: Maximum number of attempts before giving up
   /// [delay]: Base delay between retries
   /// [maxDelay]: Upper bound on delay (only applies to exponential)
   /// [exponential]: If true, uses exponential backoff (1x, 2x, 4x, 8x...);
   /// if false, uses linear backoff (1x, 2x, 3x, 4x...)
+  ///
+  /// Respects disposal: if the atom is disposed during a retry delay,
+  /// the retry loop stops and throws a [StateError].
   Future<T> executeWithRetry(
     Future<T> Function() operation, {
     int maxRetries = 3,
@@ -92,12 +97,21 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
       } catch (e) {
         attempts++;
         if (attempts >= maxRetries) rethrow;
+        if (isDisposed) rethrow;
+
         final waitDuration = exponential
             ? delay * (1 << (attempts - 1)) // 1x, 2x, 4x, 8x...
             : delay * attempts; // 1x, 2x, 3x, 4x...
         await Future.delayed(
           exponential && waitDuration > maxDelay ? maxDelay : waitDuration,
         );
+
+        // Check if cancelled during the delay
+        if (isDisposed) {
+          throw StateError(
+            'AsyncAtom "$id" was disposed during retry delay',
+          );
+        }
       }
     }
 
@@ -154,7 +168,7 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
         if (ttl != null) {
           ttlTimer?.cancel();
           ttlTimer = Timer(ttl, () {
-            if (cachedAtom.value.hasValue) {
+            if (!cachedAtom.isDisposed && cachedAtom.value.hasValue) {
               cachedAtom.clear();
             }
           });
@@ -247,7 +261,9 @@ AsyncAtom<R> computedAsync<R>(
   void executeComputation() {
     debounceTimer?.cancel();
     debounceTimer = Timer(debounce, () {
-      asyncAtom.execute(compute);
+      if (!asyncAtom.isDisposed) {
+        asyncAtom.execute(compute);
+      }
     });
   }
 
@@ -290,14 +306,17 @@ AsyncAtom<List<T>> combineAsync<T>(List<AsyncAtom<T>> atoms) {
   }
 
   void updateCombined() {
-    final values = <T>[];
     bool hasError = false;
     bool isLoading = false;
     Object? firstError;
     StackTrace? firstStackTrace;
+    int successCount = 0;
 
-    for (final atom in atoms) {
-      final asyncValue = atom.value;
+    // Pre-allocate list with correct size to maintain ordering
+    final values = List<T?>.filled(atoms.length, null);
+
+    for (int i = 0; i < atoms.length; i++) {
+      final asyncValue = atoms[i].value;
 
       if (asyncValue.hasError) {
         hasError = true;
@@ -306,7 +325,8 @@ AsyncAtom<List<T>> combineAsync<T>(List<AsyncAtom<T>> atoms) {
       } else if (asyncValue.isLoading) {
         isLoading = true;
       } else if (asyncValue.hasValue) {
-        values.add(asyncValue.value);
+        values[i] = asyncValue.value;
+        successCount++;
       }
     }
 
@@ -314,8 +334,8 @@ AsyncAtom<List<T>> combineAsync<T>(List<AsyncAtom<T>> atoms) {
       combinedAtom.setError(firstError!, firstStackTrace!);
     } else if (isLoading) {
       combinedAtom.set(const AsyncValue.loading());
-    } else if (values.length == atoms.length) {
-      combinedAtom.setData(values);
+    } else if (successCount == atoms.length) {
+      combinedAtom.setData(values.cast<T>());
     }
   }
 

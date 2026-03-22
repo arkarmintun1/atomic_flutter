@@ -1,3 +1,5 @@
+import 'dart:ui';
+
 import 'package:atomic_flutter/atomic_flutter.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -158,5 +160,74 @@ void main() {
       expect(await storage.read('x'), isNull);
       expect(await storage.read('y'), isNull);
     });
+
+    test('user set() before storage load wins over persisted value', () async {
+      final storage = InMemoryAtomStorage();
+      await storage.write('race', '"old_value"');
+
+      final atom = persistAtom<String>(
+        'default',
+        key: 'race',
+        storage: storage,
+        fromJson: (v) => v as String,
+        toJson: (v) => v,
+      );
+
+      // User sets value before async storage read completes
+      atom.set('user_value');
+
+      // Let the storage read complete
+      await Future.delayed(Duration.zero);
+
+      // User value should take priority
+      expect(atom.value, 'user_value');
+
+      atom.dispose();
+    });
+
+    test('should not write back value restored from storage', () async {
+      final storage = InMemoryAtomStorage();
+      await storage.write('counter', '42');
+
+      int writeCount = 0;
+      final trackingStorage = _WriteCountingStorage(storage, () => writeCount++);
+
+      final atom = persistAtom<int>(
+        0,
+        key: 'counter',
+        storage: trackingStorage,
+        fromJson: (v) => (v as num).toInt(),
+        toJson: (v) => v,
+      );
+
+      // Wait for storage read to complete
+      await Future.delayed(Duration.zero);
+
+      expect(atom.value, 42);
+      // Should not have written back the restored value
+      expect(writeCount, 0);
+
+      atom.dispose();
+    });
   });
+}
+
+/// A wrapper around AtomStorage that counts write calls.
+class _WriteCountingStorage implements AtomStorage {
+  final AtomStorage _delegate;
+  final VoidCallback _onWrite;
+
+  _WriteCountingStorage(this._delegate, this._onWrite);
+
+  @override
+  Future<String?> read(String key) => _delegate.read(key);
+
+  @override
+  Future<void> write(String key, String value) {
+    _onWrite();
+    return _delegate.write(key, value);
+  }
+
+  @override
+  Future<void> delete(String key) => _delegate.delete(key);
 }

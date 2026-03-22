@@ -95,7 +95,7 @@ class AsyncValue<T> {
   bool get isLoading => state == AsyncState.loading;
 
   /// Whether the operation completed successfully
-  bool get hasValue => state == AsyncState.success && data != null;
+  bool get hasValue => state == AsyncState.success;
 
   /// Whether the operation resulted in an error
   bool get hasError => state == AsyncState.error;
@@ -111,10 +111,10 @@ class AsyncValue<T> {
     if (hasError) {
       throw error!;
     }
-    if (data == null) {
-      throw StateError('AsyncValue has no data');
+    if (!hasValue) {
+      throw StateError('AsyncValue has no data (state: $state)');
     }
-    return data!;
+    return data as T;
   }
 
   /// Transform the data if present
@@ -177,12 +177,17 @@ class AsyncValue<T> {
   bool operator ==(Object other) =>
       identical(this, other) ||
       other is AsyncValue<T> &&
+          state == other.state &&
           data == other.data &&
-          error == other.error &&
-          state == other.state;
+          // Error states always compare unequal so retries that hit
+          // the same error still trigger rebuilds.
+          !hasError &&
+          error == other.error;
 
   @override
-  int get hashCode => Object.hash(data, error, state);
+  int get hashCode => hasError
+      ? Object.hash(data, error, state, identityHashCode(this))
+      : Object.hash(data, error, state);
 
   @override
   String toString() => 'AsyncValue<$T>($state, data: $data, error: $error)';
@@ -207,11 +212,20 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
           disposeTimeout: disposeTimeout,
         );
 
-  /// Execute an async operation
+  /// Execute an async operation.
+  ///
+  /// If a new [execute] call is made before this one completes, the previous
+  /// operation is superseded: its result is still returned to the caller, but
+  /// the atom's state is **not** updated. Callers that chain logic on the
+  /// return value should check [value] to confirm the atom adopted the result.
   Future<T> execute(
     Future<T> Function() operation, {
     bool keepPreviousData = false,
   }) async {
+    if (isDisposed) {
+      throw StateError('Cannot execute on disposed AsyncAtom "$id"');
+    }
+
     // Store current state before setting loading
     _stateBeforeLoading = value;
 
@@ -235,7 +249,8 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
     try {
       final result = await operation();
 
-      if (_operationId == currentOperationId) {
+      final isActive = !isDisposed && _operationId == currentOperationId;
+      if (isActive) {
         final duration = DateTime.now().difference(_loadingStartTime!);
         set(AsyncValue.success(result));
         _stateBeforeLoading = null;
@@ -251,7 +266,7 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
 
       return result;
     } catch (error, stackTrace) {
-      if (_operationId == currentOperationId) {
+      if (!isDisposed && _operationId == currentOperationId) {
         final duration = DateTime.now().difference(_loadingStartTime!);
         set(AsyncValue.error(error, stackTrace, data: previousData));
         _stateBeforeLoading = null;
@@ -291,18 +306,20 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
   void cancel() {
     _operationId++;
 
-    // Restore previous state if we were loading
+    // Restore previous state if we were loading — bypass middleware
+    // since this is an internal state restoration, not a user-driven update.
     if (value.isLoading && _stateBeforeLoading != null) {
-      set(_stateBeforeLoading!);
+      setDirect(_stateBeforeLoading!);
       _stateBeforeLoading = null;
     }
   }
 
-  /// Clear the current state back to idle
+  /// Clear the current state back to idle — bypasses middleware since this
+  /// is an internal reset, not a user-driven update.
   void clear() {
     _operationId++;
     _stateBeforeLoading = null;
-    set(const AsyncValue.idle());
+    setDirect(const AsyncValue.idle());
   }
 
   /// Set data directly (useful for optimistic updates)
@@ -375,6 +392,7 @@ class StreamAtom<T> extends AsyncAtom<T> {
   ///
   /// Useful for reconnecting to a WebSocket or refreshing a live query.
   void reconnect(Stream<T> newStream, {bool keepPreviousDataOnError = false}) {
+    if (isDisposed) return;
     set(const AsyncValue.loading());
     _subscribe(newStream, keepPreviousDataOnError: keepPreviousDataOnError);
   }

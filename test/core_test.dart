@@ -107,9 +107,66 @@ void main() {
       atom.addListener((value) => notificationCount++);
       atom.dispose();
 
-      // Should not throw and should not notify after disposal
+      // Should not throw, should not notify, and should not mutate
       expect(() => atom.set(2), returnsNormally);
       expect(notificationCount, 0);
+      expect(atom.value, 1); // Value unchanged after dispose
+      expect(atom.isDisposed, true);
+    });
+
+    test('should not allow addListener after dispose', () {
+      final atom = Atom<int>(1);
+      atom.dispose();
+
+      int notificationCount = 0;
+      atom.addListener((value) => notificationCount++);
+
+      // Listener should not have been added
+      expect(atom.refCount, 0);
+    });
+
+    test('should be idempotent on double dispose', () {
+      final atom = Atom<int>(1);
+      int disposeCount = 0;
+      atom.onDispose(() => disposeCount++);
+
+      atom.dispose();
+      atom.dispose(); // Should not throw or run callbacks again
+
+      expect(disposeCount, 1);
+    });
+
+    test('should not update value via _setDirect after dispose', () {
+      final baseAtom = Atom<int>(5);
+      final computedAtom =
+          computed(() => baseAtom.value * 2, tracked: [baseAtom]);
+
+      expect(computedAtom.value, 10);
+      computedAtom.dispose();
+
+      // Updating baseAtom triggers _computeValue -> _setDirect on disposed computed
+      baseAtom.set(10);
+      expect(computedAtom.value, 10); // Should remain unchanged
+    });
+
+    test('should run onDispose callback immediately if already disposed', () {
+      final atom = Atom<int>(1);
+      atom.dispose();
+
+      bool callbackRan = false;
+      atom.onDispose(() => callbackRan = true);
+      expect(callbackRan, true);
+    });
+
+    test('should allow removing onDispose callbacks', () {
+      final atom = Atom<int>(1);
+      int callCount = 0;
+
+      final remove = atom.onDispose(() => callCount++);
+      remove(); // Unregister before disposal
+
+      atom.dispose();
+      expect(callCount, 0);
     });
 
     test('should support onDispose callbacks', () {
@@ -355,6 +412,35 @@ void main() {
       // Should create new atom for same key
       final atom2 = family(1);
       expect(atom2, isNot(same(atom1)));
+    });
+
+    test('should auto-remove disposed atoms from map', () {
+      final family =
+          AtomFamily<String, int>((key) => Atom<String>('value-$key'));
+
+      final atom1 = family(1);
+      expect(family.keys, contains(1));
+
+      atom1.dispose();
+      expect(family.keys, isNot(contains(1)));
+
+      // Calling family(1) again should create a fresh atom
+      final atom1Again = family(1);
+      expect(atom1Again, isNot(same(atom1)));
+      expect(atom1Again.isDisposed, false);
+    });
+
+    test('should return fresh atom if existing one was disposed', () {
+      final family =
+          AtomFamily<String, int>((key) => Atom<String>('value-$key'));
+
+      final atom = family(1);
+      atom.dispose();
+
+      // Family should detect disposed atom and create a new one
+      final freshAtom = family(1);
+      expect(freshAtom.isDisposed, false);
+      expect(freshAtom.value, 'value-1');
     });
   });
 
@@ -768,6 +854,18 @@ void main() {
 
       atom.set(6); // different value
       expect(notificationCount, 1);
+    });
+
+    test('should handle listener adding another listener during notification', () {
+      final atom = Atom<int>(0);
+
+      atom.addListener((value) {
+        // Add another listener during notification
+        atom.addListener((_) {});
+      });
+
+      // Should not throw ConcurrentModificationError
+      expect(() => atom.set(1), returnsNormally);
     });
 
     test('listener that removes itself during notification does not throw', () {

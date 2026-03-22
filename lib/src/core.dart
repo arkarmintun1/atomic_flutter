@@ -11,6 +11,8 @@ typedef AtomTransformer<T> = T Function(T oldValue, T newValue);
 
 /// A single atomic unit of state
 class Atom<T> {
+  static int _nextId = 0;
+
   final String _id;
   T _value;
   final bool Function(T, T)? _equals;
@@ -19,6 +21,9 @@ class Atom<T> {
   final Set<WeakReference<Atom>> _dependents = {};
   int _batchDepth = 0;
   bool _isDirty = false;
+  bool _isDisposed = false;
+  T? _snapshotBeforeBatch; // Value before global batch, for rollback
+  bool _hasSnapshot = false;
 
   // Memory management properties
   int _refCount = 0;
@@ -81,7 +86,7 @@ class Atom<T> {
     Duration? disposeTimeout,
     bool Function(T, T)? equals,
     List<AtomTransformer<T>>? middleware,
-  })  : _id = id ?? 'atom_${identityHashCode(_value)}',
+  })  : _id = id ?? 'atom_${_nextId++}',
         _autoDispose = autoDispose,
         _disposeTimeout = disposeTimeout,
         _equals = equals,
@@ -108,6 +113,9 @@ class Atom<T> {
 
   /// Whether this atom has any listeners
   bool get hasListeners => _listeners.isNotEmpty;
+
+  /// Whether this atom has been disposed
+  bool get isDisposed => _isDisposed;
 
   /// Debug-only: IDs of atoms this atom depends on.
   ///
@@ -148,6 +156,12 @@ class Atom<T> {
   /// actually changes (using the custom [equals] function if provided,
   /// otherwise falling back to `identical` + `==`).
   void set(T newValue) {
+    if (_isDisposed) {
+      if (debugMode) {
+        print('AtomicFlutter: WARNING — set() called on disposed atom "$_id"');
+      }
+      return;
+    }
     T result = newValue;
     for (final t in _localMiddleware) {
       result = t(_value, result);
@@ -162,11 +176,22 @@ class Atom<T> {
   ///
   /// Used internally by computed atoms and async state transitions where
   /// the value is derived by the framework, not driven by user code.
+  ///
+  /// Subclasses in other libraries (e.g. [AsyncAtom]) can use
+  /// [setDirect] instead.
   void _setDirect(T newValue) {
+    if (_isDisposed) return;
+
     final isEqual = _equals != null
         ? _equals(_value, newValue)
         : (identical(_value, newValue) || _value == newValue);
     if (isEqual) return;
+
+    // Snapshot for rollback before first mutation in a global batch
+    if (Atom._globalBatching && !_hasSnapshot) {
+      _snapshotBeforeBatch = _value;
+      _hasSnapshot = true;
+    }
 
     _value = newValue;
 
@@ -176,6 +201,13 @@ class Atom<T> {
 
     _notifyListeners();
   }
+
+  /// Stores [newValue] and notifies listeners, bypassing middleware.
+  ///
+  /// This is the public-facing equivalent of [_setDirect] for subclasses
+  /// in other libraries (e.g. [AsyncAtom]). Not intended for end-user code.
+  @protected
+  void setDirect(T newValue) => _setDirect(newValue);
 
   /// Update the atom value using a transformer function
   ///
@@ -262,6 +294,12 @@ class Atom<T> {
   ///
   /// [listener]: A function that will be called with the new value when it changes
   void addListener(void Function(T value) listener) {
+    if (_isDisposed) {
+      if (debugMode) {
+        print('AtomicFlutter: WARNING — addListener() called on disposed atom "$_id"');
+      }
+      return;
+    }
     final atomListener = _AtomListener<T>(listener);
     if (!_listeners.contains(atomListener)) {
       _listeners.add(atomListener);
@@ -280,11 +318,21 @@ class Atom<T> {
     }
   }
 
-  /// Register a function to be called when this atom is disposed
+  /// Register a function to be called when this atom is disposed.
   ///
-  /// [callback]: A function that will be called when the atom is disposed
-  void onDispose(VoidCallback callback) {
+  /// Returns a function that removes this callback, so callers can
+  /// unregister if the cleanup is no longer needed.
+  ///
+  /// If the atom is already disposed, the callback is invoked immediately
+  /// and a no-op removal function is returned.
+  VoidCallback onDispose(VoidCallback callback) {
+    if (_isDisposed) {
+      // Already disposed — run immediately so cleanup is never skipped.
+      callback();
+      return () {};
+    }
     _disposeCallbacks.add(callback);
+    return () => _disposeCallbacks.remove(callback);
   }
 
   /// Increment the reference counter
@@ -322,10 +370,29 @@ class Atom<T> {
     });
   }
 
+  /// Restore value to snapshot taken before global batch. Used on error.
+  void _rollback() {
+    if (_hasSnapshot) {
+      _value = _snapshotBeforeBatch as T;
+      _hasSnapshot = false;
+      _snapshotBeforeBatch = null;
+      _isDirty = false;
+    }
+  }
+
+  /// Discard the snapshot after a successful batch.
+  void _clearSnapshot() {
+    _hasSnapshot = false;
+    _snapshotBeforeBatch = null;
+  }
+
   /// Explicitly dispose this atom
   ///
   /// This will remove all listeners and references to this atom.
   void dispose() {
+    if (_isDisposed) return;
+    _isDisposed = true;
+
     if (debugMode) {
       print('AtomicFlutter: Disposing atom $_id');
       AtomDebugger.unregister(this);
@@ -483,8 +550,12 @@ void atomicUpdate(void Function() updates) {
     updates();
   } catch (_) {
     Atom._globalBatchDepth--;
-    // Only discard pending notifications if this is the outermost batch
+    // Only rollback and discard if this is the outermost batch
     if (Atom._globalBatchDepth == 0) {
+      // Restore values that were mutated during the failed batch
+      for (final atom in Atom._globalDirtyAtoms) {
+        atom._rollback();
+      }
       Atom._globalDirtyAtoms.clear();
     }
     rethrow;
@@ -498,6 +569,7 @@ void atomicUpdate(void Function() updates) {
   final dirty = List<Atom>.of(Atom._globalDirtyAtoms);
   Atom._globalDirtyAtoms.clear();
   for (final atom in dirty) {
+    atom._clearSnapshot();
     atom._notifyListeners();
   }
 }
@@ -542,7 +614,23 @@ class AtomFamily<T, K> {
 
   /// Get or create an atom for the given key
   Atom<T> call(K key) {
-    return _atoms.putIfAbsent(key, () => _creator(key));
+    final existing = _atoms[key];
+    if (existing != null && !existing.isDisposed) {
+      return existing;
+    }
+
+    // Remove stale entry if disposed
+    if (existing != null) {
+      _atoms.remove(key);
+    }
+
+    final atom = _creator(key);
+    _atoms[key] = atom;
+
+    // Auto-clean the map entry when the atom is disposed
+    atom.onDispose(() => _atoms.remove(key));
+
+    return atom;
   }
 
   /// Dispose a specific atom by key
@@ -553,10 +641,13 @@ class AtomFamily<T, K> {
 
   /// Dispose all atoms in this family
   void dispose() {
-    for (final atom in _atoms.values) {
+    // Snapshot values before iterating — onDispose callbacks remove
+    // entries from _atoms, which would cause ConcurrentModificationError.
+    final atomsToDispose = List.of(_atoms.values);
+    _atoms.clear();
+    for (final atom in atomsToDispose) {
       atom.dispose();
     }
-    _atoms.clear();
   }
 
   /// Get all active keys

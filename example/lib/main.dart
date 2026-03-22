@@ -474,18 +474,13 @@ class _EnhancedProductListTabState extends State<EnhancedProductListTab> {
             ),
           ),
 
-          // SHOWCASE: AsyncBuilder with retry and refresh
+          // SHOWCASE: AsyncAtomBuilder with retry and refresh
           Expanded(
-            child: AsyncBuilder<List<Product>>(
+            child: AsyncAtomBuilder<List<Product>>(
               atom: productsAsyncAtom,
-              // Pull-to-refresh enabled
-              enableRefresh: true,
-              onRefresh: () => productsAsyncAtom.loadProducts(),
-              // Retry on error
-              enableRetry: true,
-              retryOperation: () => productsAsyncAtom.loadProducts(),
+              operation: () => productsAsyncAtom.loadProducts(),
               // Loading state
-              loading: (context) => const Center(
+              loading: (context, _) => const Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -496,7 +491,7 @@ class _EnhancedProductListTabState extends State<EnhancedProductListTab> {
                 ),
               ),
               // Error state with retry button
-              error: (context, error) => Center(
+              error: (context, error, stackTrace, _) => Center(
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -634,10 +629,11 @@ class EnhancedCartTab extends StatelessWidget {
             ),
           ),
 
-          // SHOWCASE: select() - only rebuilds when total changes
-          AtomBuilder(
-            atom: cartAtom.select((cart) => cart.totalPrice),
-            builder: (context, total, _) {
+          // SHOWCASE: AtomSelector - only rebuilds when total changes
+          AtomSelector<Cart, double>(
+            atom: cartAtom,
+            selector: (cart) => cart.totalPrice,
+            builder: (context, total) {
               return Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
@@ -821,7 +817,7 @@ class _FeaturesShowcaseTabState extends State<FeaturesShowcaseTab> {
                   idle: (context) => const Text('Idle - Click button to load'),
                   loading: (context, previousData) =>
                       const CircularProgressIndicator(),
-                  success: (context, data) => Text('Success: $data'),
+                  builder: (context, data) => Text('Success: $data'),
                   error: (context, error, stack, data) => Text('Error: $error'),
                 ),
               ),

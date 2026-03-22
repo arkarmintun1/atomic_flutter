@@ -30,6 +30,7 @@ mixin WatchAtom<T extends StatefulWidget> on State<T> {
   final Set<Atom> _watching = {};
 
   bool _reconcileScheduled = false;
+  bool _buildInProgress = false;
 
   /// Watch [atom] and return its current value.
   ///
@@ -43,13 +44,18 @@ mixin WatchAtom<T extends StatefulWidget> on State<T> {
       'watch() was called outside of build().\n'
       'Only call watch() directly inside the build() method of your State.',
     );
+
+    // Clear on the first watch() call of each build pass.
+    if (!_buildInProgress) {
+      _buildInProgress = true;
+      _watching.clear();
+    }
+
     _watching.add(atom);
 
     if (!_subscriptions.containsKey(atom)) {
       void listener(V _) {
         if (mounted) {
-          // Clear so the next build starts with a fresh watched set.
-          _watching.clear();
           setState(() {});
         }
       }
@@ -67,13 +73,14 @@ mixin WatchAtom<T extends StatefulWidget> on State<T> {
     _reconcileScheduled = true;
     SchedulerBinding.instance.addPostFrameCallback((_) {
       _reconcileScheduled = false;
+      _buildInProgress = false;
+      if (!mounted) return;
       // Remove subscriptions for atoms not watched in the last build.
       final toRemove =
           _subscriptions.keys.where((a) => !_watching.contains(a)).toList();
       for (final atom in toRemove) {
         _subscriptions.remove(atom)?.call();
       }
-      _watching.clear();
     });
   }
 
