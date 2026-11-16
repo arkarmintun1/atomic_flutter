@@ -86,7 +86,12 @@ class AsyncAtomBuilder<T> extends StatelessWidget {
 
     if (operation != null) {
       return RefreshIndicator(
-        onRefresh: () async => atom.execute(operation!),
+        // Errors land in the atom's error state; swallow the rethrow so
+        // RefreshIndicator doesn't surface an unhandled exception.
+        onRefresh: () => atom.execute(operation!).then<void>(
+          (_) {},
+          onError: (Object _) {},
+        ),
         child: content,
       );
     }
@@ -110,7 +115,7 @@ class AsyncAtomBuilder<T> extends StatelessWidget {
             Text('Error: $err'),
             const SizedBox(height: 16),
             ElevatedButton(
-              onPressed: () => atom.execute(operation!),
+              onPressed: () => atom.execute(operation!).ignore(),
               child: const Text('Retry'),
             ),
           ],

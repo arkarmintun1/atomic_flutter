@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'core.dart';
 import 'devtools_service.dart';
 
@@ -48,8 +50,8 @@ class AtomDebugger {
 
   /// Print information about all registered atoms
   static void printAtomInfo() {
-    print('=== AtomicFlutter Debug Info ===');
-    print('Total atoms: ${_debugRegistry.length}');
+    debugPrint('=== AtomicFlutter Debug Info ===');
+    debugPrint('Total atoms: ${_debugRegistry.length}');
 
     for (final atom in _debugRegistry.values) {
       final value = atom.value;
@@ -57,10 +59,10 @@ class AtomDebugger {
           ? '${value.toString().substring(0, 100)}...'
           : value.toString();
 
-      print('Atom ${atom.id}: $valueString (refs: ${atom.refCount})');
+      debugPrint('Atom ${atom.id}: $valueString (refs: ${atom.refCount})');
     }
 
-    print('===============================');
+    debugPrint('===============================');
   }
 
   /// Clear all registered atoms
@@ -104,16 +106,16 @@ class AtomPerformanceMonitor {
   /// Print performance summary
   static void printSummary() {
     if (_metrics.isEmpty) {
-      print('No atom metrics available');
+      debugPrint('No atom metrics available');
       return;
     }
 
-    print('=== AtomicFlutter Performance Summary ===');
+    debugPrint('=== AtomicFlutter Performance Summary ===');
     for (final metrics in _metrics.values) {
-      print('${metrics.atomId}: ${metrics.updateCount} updates, '
+      debugPrint('${metrics.atomId}: ${metrics.updateCount} updates, '
           'avg: ${metrics.averageUpdateInterval.inMilliseconds}ms');
     }
-    print('=========================================');
+    debugPrint('=========================================');
   }
 }
 
@@ -174,10 +176,10 @@ class AtomMemoryTracker {
   static int get trackedAtomCount => _trackedAtoms.length;
 
   static void printMemoryUsage() {
-    print('=== AtomicFlutter Memory Usage ===');
-    print('Tracked atoms: ${_trackedAtoms.length}');
-    print('Active atoms: ${AtomDebugger.getAllAtoms().length}');
-    print('==================================');
+    debugPrint('=== AtomicFlutter Memory Usage ===');
+    debugPrint('Tracked atoms: ${_trackedAtoms.length}');
+    debugPrint('Active atoms: ${AtomDebugger.getAllAtoms().length}');
+    debugPrint('==================================');
   }
 }
 

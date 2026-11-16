@@ -30,7 +30,16 @@ extension AtomExtensions<T> on Atom<T> {
   /// and then emit new values whenever the atom changes.
   Stream<T> asStream() {
     late StreamController<T> controller;
-    late void Function(T) listener;
+    void Function(T)? listener;
+    VoidCallback? removeDisposeHook;
+
+    void detach() {
+      final l = listener;
+      if (l != null) removeListener(l);
+      listener = null;
+      removeDisposeHook?.call();
+      removeDisposeHook = null;
+    }
 
     controller = StreamController<T>(
       onListen: () {
@@ -41,25 +50,29 @@ extension AtomExtensions<T> on Atom<T> {
           }
         });
 
-        listener = (T value) {
+        void forward(T newValue) {
           if (!controller.isClosed) {
-            controller.add(value);
+            controller.add(newValue);
           }
-        };
-        addListener(listener);
+        }
+
+        listener = forward;
+        addListener(forward);
       },
       onCancel: () {
-        removeListener(listener);
+        detach();
         if (!controller.isClosed) {
           controller.close();
         }
       },
     );
 
-    // Close controller when atom is disposed
-    onDispose(() {
+    // Close controller when atom is disposed. The hook is removed again when
+    // the stream is cancelled so long-lived atoms don't accumulate callbacks.
+    removeDisposeHook = onDispose(() {
+      removeDisposeHook = null;
+      detach();
       if (!controller.isClosed) {
-        removeListener(listener);
         controller.close();
       }
     });
@@ -124,16 +137,18 @@ extension AtomExtensions<T> on Atom<T> {
 
     addListener(listener);
 
-    // Cleanup when derived atom is disposed
+    // Cleanup derived atom when source atom is disposed
+    final removeSourceHook = onDispose(() {
+      debounceTimer?.cancel();
+      debouncedAtom.dispose();
+    });
+
+    // Cleanup when derived atom is disposed. Also unregister the source
+    // hook so long-lived sources don't accumulate dispose callbacks.
     debouncedAtom.onDispose(() {
       debounceTimer?.cancel();
       removeListener(listener);
-    });
-
-    // Cleanup derived atom when source atom is disposed
-    onDispose(() {
-      debounceTimer?.cancel();
-      debouncedAtom.dispose();
+      removeSourceHook();
     });
 
     return debouncedAtom;
@@ -178,23 +193,25 @@ extension AtomExtensions<T> on Atom<T> {
         }
       } catch (e) {
         if (Atom.debugMode) {
-          print('AtomicFlutter: Throttle error in atom $id: $e');
+          debugPrint('AtomicFlutter: Throttle error in atom $id: $e');
         }
       }
     }
 
     addListener(listener);
 
-    // Cleanup when derived atom is disposed
+    // Cleanup derived atom when source atom is disposed
+    final removeSourceHook = onDispose(() {
+      trailingTimer?.cancel();
+      throttledAtom.dispose();
+    });
+
+    // Cleanup when derived atom is disposed. Also unregister the source
+    // hook so long-lived sources don't accumulate dispose callbacks.
     throttledAtom.onDispose(() {
       trailingTimer?.cancel();
       removeListener(listener);
-    });
-
-    // Cleanup derived atom when source atom is disposed
-    onDispose(() {
-      trailingTimer?.cancel();
-      throttledAtom.dispose();
+      removeSourceHook();
     });
 
     return throttledAtom;
@@ -213,21 +230,23 @@ extension AtomExtensions<T> on Atom<T> {
       } catch (e) {
         // Handle mapping errors gracefully
         if (Atom.debugMode) {
-          print('AtomicFlutter: Mapping error in atom $id: $e');
+          debugPrint('AtomicFlutter: Mapping error in atom $id: $e');
         }
       }
     }
 
     addListener(listener);
 
-    // Cleanup when derived atom is disposed
-    mappedAtom.onDispose(() {
-      removeListener(listener);
+    // Cleanup derived atom when source atom is disposed
+    final removeSourceHook = onDispose(() {
+      mappedAtom.dispose();
     });
 
-    // Cleanup derived atom when source atom is disposed
-    onDispose(() {
-      mappedAtom.dispose();
+    // Cleanup when derived atom is disposed. Also unregister the source
+    // hook so long-lived sources don't accumulate dispose callbacks.
+    mappedAtom.onDispose(() {
+      removeListener(listener);
+      removeSourceHook();
     });
 
     return mappedAtom;
@@ -246,21 +265,23 @@ extension AtomExtensions<T> on Atom<T> {
         }
       } catch (e) {
         if (Atom.debugMode) {
-          print('AtomicFlutter: Filter predicate error in atom $id: $e');
+          debugPrint('AtomicFlutter: Filter predicate error in atom $id: $e');
         }
       }
     }
 
     addListener(listener);
 
-    // Cleanup when derived atom is disposed
-    filteredAtom.onDispose(() {
-      removeListener(listener);
+    // Cleanup derived atom when source atom is disposed
+    final removeSourceHook = onDispose(() {
+      filteredAtom.dispose();
     });
 
-    // Cleanup derived atom when source atom is disposed
-    onDispose(() {
-      filteredAtom.dispose();
+    // Cleanup when derived atom is disposed. Also unregister the source
+    // hook so long-lived sources don't accumulate dispose callbacks.
+    filteredAtom.onDispose(() {
+      removeListener(listener);
+      removeSourceHook();
     });
 
     return filteredAtom;
@@ -277,7 +298,7 @@ extension AtomExtensions<T> on Atom<T> {
         combinedAtom.set((value, other.value));
       } catch (e) {
         if (Atom.debugMode) {
-          print('AtomicFlutter: Combine error in atom $id: $e');
+          debugPrint('AtomicFlutter: Combine error in atom $id: $e');
         }
       }
     }
@@ -289,16 +310,20 @@ extension AtomExtensions<T> on Atom<T> {
     other.addListener(otherListener);
 
     // Cleanup when combined atom is disposed
-    combinedAtom.onDispose(() {
-      removeListener(thisListener);
-      other.removeListener(otherListener);
-    });
-
     // Cleanup combined atom when either source atom is disposed.
     // Use removal functions to prevent the second source's callback from
     // running after the combined atom is already disposed.
     late final VoidCallback removeThisDispose;
     late final VoidCallback removeOtherDispose;
+
+    combinedAtom.onDispose(() {
+      removeListener(thisListener);
+      other.removeListener(otherListener);
+      // Unregister the source hooks so long-lived sources don't accumulate
+      // dispose callbacks when the combined atom goes away first.
+      removeThisDispose();
+      removeOtherDispose();
+    });
 
     removeThisDispose = onDispose(() {
       removeOtherDispose();

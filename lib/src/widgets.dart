@@ -56,7 +56,9 @@ class _AtomBuilderState<T> extends State<AtomBuilder<T>> {
   @override
   void didUpdateWidget(AtomBuilder<T> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.atom != widget.atom) {
+    // Identity, not `==`: Atom equality is by id, and a different atom that
+    // happens to share an id must still be resubscribed.
+    if (!identical(oldWidget.atom, widget.atom)) {
       oldWidget.atom.removeListener(_onValueChanged);
       _value = widget.atom.value;
       widget.atom.addListener(_onValueChanged);
@@ -109,7 +111,7 @@ class MultiAtomBuilder extends StatefulWidget {
 }
 
 class _MultiAtomBuilderState extends State<MultiAtomBuilder> {
-  final Map<Atom, void Function(dynamic)> _listeners = {};
+  final Map<Atom, void Function(dynamic)> _listeners = Map.identity();
 
   @override
   void initState() {
@@ -217,11 +219,13 @@ class _AtomSelectorState<T, S> extends State<AtomSelector<T, S>> {
   @override
   void didUpdateWidget(AtomSelector<T, S> oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.atom != widget.atom) {
+    if (!identical(oldWidget.atom, widget.atom)) {
       oldWidget.atom.removeListener(_onStateChanged);
-      selectedValue = widget.selector(widget.atom.value);
       widget.atom.addListener(_onStateChanged);
     }
+    // Always re-select: the selector is usually a new closure that may
+    // capture different inputs (e.g. `(list) => list[index]` with a new index).
+    selectedValue = widget.selector(widget.atom.value);
   }
 
   @override
@@ -231,7 +235,18 @@ class _AtomSelectorState<T, S> extends State<AtomSelector<T, S>> {
   }
 
   void _onStateChanged(T value) {
-    final newSelectedValue = widget.selector(value);
+    if (!mounted) return;
+    final S newSelectedValue;
+    try {
+      newSelectedValue = widget.selector(value);
+    } catch (e, stackTrace) {
+      // Keep the last good selection, consistent with select() and map().
+      if (Atom.debugMode) {
+        debugPrint('AtomicFlutter: Selector error for atom "${widget.atom.id}": '
+            '$e\n$stackTrace');
+      }
+      return;
+    }
     final isEqual = widget.equals != null
         ? widget.equals!(selectedValue, newSelectedValue)
         : selectedValue == newSelectedValue;
