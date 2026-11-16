@@ -1,7 +1,8 @@
 // Regression tests for the fixes shipped in 0.5.2.
 //
-// Each group targets one bug found in the v0.5.1 review. Every test here
-// fails (or reports an unhandled error) against 0.5.1.
+// Each group targets one bug found in the v0.5.1 review. Most tests fail
+// (or report an unhandled error) against 0.5.1; a few pin down behaviour
+// that must keep working alongside the fix.
 import 'package:atomic_flutter/atomic_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
