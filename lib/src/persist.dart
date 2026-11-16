@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:atomic_flutter/src/core.dart';
+import 'package:flutter/foundation.dart';
 
 /// Storage backend for [persistAtom].
 ///
@@ -115,14 +116,21 @@ Atom<T> persistAtom<T>(
     if (isRestoring) {
       userSetDuringRestore = true;
     }
-    try {
-      storage.write(key, jsonEncode(toJson(value)));
-    } catch (e) {
+    void reportWriteError(Object e) {
       if (Atom.debugMode) {
-        print(
-          'AtomicFlutter [persistAtom]: Failed to persist "$key": $e',
-        );
+        debugPrint('AtomicFlutter [persistAtom]: Failed to persist "$key": $e');
       }
+    }
+
+    try {
+      // Synchronous failures (toJson / jsonEncode) are caught below;
+      // asynchronous storage failures are handled on the returned future so
+      // they never surface as unhandled errors.
+      storage
+          .write(key, jsonEncode(toJson(value)))
+          .then<void>((_) {}, onError: (Object e) => reportWriteError(e));
+    } catch (e) {
+      reportWriteError(e);
     }
   }
 
@@ -132,7 +140,7 @@ Atom<T> persistAtom<T>(
   // Async load: read stored value and update atom if present.
   // If the user called set() before this completes, skip the restore
   // to avoid overwriting the user's value.
-  storage.read(key).then((raw) {
+  void onRestored(String? raw) {
     isRestoring = false;
     if (raw == null) return;
     if (userSetDuringRestore) return; // User value takes priority
@@ -146,10 +154,17 @@ Atom<T> persistAtom<T>(
     } catch (e) {
       skipNextWrite = false;
       if (Atom.debugMode) {
-        print(
-          'AtomicFlutter [persistAtom]: Failed to restore "$key": $e',
-        );
+        debugPrint('AtomicFlutter [persistAtom]: Failed to restore "$key": $e');
       }
+    }
+  }
+
+  // A failing read must not surface as an unhandled error; the atom simply
+  // keeps its default value.
+  storage.read(key).then<void>(onRestored, onError: (Object e) {
+    isRestoring = false;
+    if (Atom.debugMode) {
+      debugPrint('AtomicFlutter [persistAtom]: Failed to read "$key": $e');
     }
   });
 

@@ -47,7 +47,8 @@ class Atom<T> {
   // Global batch state — atoms modified during a batch defer notifications
   static int _globalBatchDepth = 0;
   static bool get _globalBatching => _globalBatchDepth > 0;
-  static final LinkedHashSet<Atom> _globalDirtyAtoms = LinkedHashSet();
+  // Identity-based: two atoms sharing a user-supplied id must both be flushed.
+  static final LinkedHashSet<Atom> _globalDirtyAtoms = LinkedHashSet.identity();
 
   /// Register [middleware] globally — it will be called for every atom.
   ///
@@ -158,7 +159,8 @@ class Atom<T> {
   void set(T newValue) {
     if (_isDisposed) {
       if (debugMode) {
-        print('AtomicFlutter: WARNING — set() called on disposed atom "$_id"');
+        debugPrint(
+            'AtomicFlutter: WARNING — set() called on disposed atom "$_id"');
       }
       return;
     }
@@ -246,7 +248,7 @@ class Atom<T> {
           dependent._computeValue();
         } catch (e, stackTrace) {
           if (debugMode) {
-            print(
+            debugPrint(
               'AtomicFlutter: Error in computed atom "${dependent.id}" '
               'while recomputing from dependency "$_id": $e\n$stackTrace',
             );
@@ -263,7 +265,7 @@ class Atom<T> {
         listener._notify(_value);
       } catch (e, stackTrace) {
         if (debugMode) {
-          print(
+          debugPrint(
             'AtomicFlutter: Error in listener for atom "$_id": $e\n$stackTrace',
           );
         }
@@ -296,7 +298,8 @@ class Atom<T> {
   void addListener(void Function(T value) listener) {
     if (_isDisposed) {
       if (debugMode) {
-        print('AtomicFlutter: WARNING — addListener() called on disposed atom "$_id"');
+        debugPrint(
+            'AtomicFlutter: WARNING — addListener() called on disposed atom "$_id"');
       }
       return;
     }
@@ -334,6 +337,10 @@ class Atom<T> {
     _disposeCallbacks.add(callback);
     return () => _disposeCallbacks.remove(callback);
   }
+
+  /// Number of registered [onDispose] callbacks. Exposed for leak tests.
+  @visibleForTesting
+  int get debugDisposeCallbackCount => _disposeCallbacks.length;
 
   /// Increment the reference counter
   void _incrementRefCount() {
@@ -394,16 +401,19 @@ class Atom<T> {
     _isDisposed = true;
 
     if (debugMode) {
-      print('AtomicFlutter: Disposing atom $_id');
+      debugPrint('AtomicFlutter: Disposing atom $_id');
       AtomDebugger.unregister(this);
     }
 
-    for (final callback in _disposeCallbacks) {
+    // Snapshot: a callback may unregister other callbacks (e.g. a derived
+    // atom removing its cleanup hook from this source while being disposed).
+    for (final callback in List.of(_disposeCallbacks)) {
       try {
         callback();
       } catch (e) {
         if (debugMode) {
-          print('AtomicFlutter: Error in dispose callback for atom $_id: $e');
+          debugPrint(
+              'AtomicFlutter: Error in dispose callback for atom $_id: $e');
         }
       }
     }
@@ -416,7 +426,7 @@ class Atom<T> {
     for (final weakRef in _dependencies) {
       final dep = weakRef.target;
       if (dep != null) {
-        dep._dependents.removeWhere((ref) => ref.target == this);
+        dep._dependents.removeWhere((ref) => identical(ref.target, this));
       }
     }
 
@@ -544,10 +554,24 @@ Atom<R> computed<R>(
 ///
 /// Throws if [updates] throws — dirty atoms are not flushed in that case,
 /// leaving state as it was before the failed updates.
+///
+/// [updates] must be synchronous. Passing an `async` callback throws an
+/// [AssertionError] in debug builds.
 void atomicUpdate(void Function() updates) {
   Atom._globalBatchDepth++;
   try {
-    updates();
+    // `void Function()` also accepts an async closure, but anything after its
+    // first `await` would run outside the batch. Catch that in debug builds.
+    // `void` is a top type, so this assignment needs no cast and lets us
+    // inspect the runtime return value.
+    final Object? Function() run = updates;
+    final result = run();
+    assert(
+      result is! Future,
+      'atomicUpdate() received an async callback. Only the code before the '
+      'first await is batched. Await your async work first, then call '
+      'atomicUpdate() with a synchronous callback.',
+    );
   } catch (_) {
     Atom._globalBatchDepth--;
     // Only rollback and discard if this is the outermost batch
@@ -668,8 +692,12 @@ class _AtomListener<T> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      (other is _AtomListener<T> && identical(callback, other.callback));
+      // Use `==`, not `identical`: each tear-off of an instance method
+      // (e.g. `_onValueChanged`) creates a new closure object. Tear-offs of
+      // the same method on the same receiver are `==` but not identical, so
+      // `identical` would make removeListener(_onValueChanged) a silent no-op.
+      (other is _AtomListener<T> && callback == other.callback);
 
   @override
-  int get hashCode => identityHashCode(callback);
+  int get hashCode => callback.hashCode;
 }

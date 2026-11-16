@@ -26,16 +26,18 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
 
     addListener(listener);
 
-    // Cleanup when derived atom is disposed
+    // Cleanup derived atom when source atom is disposed
+    final removeSourceHook = onDispose(() {
+      debounceTimer?.cancel();
+      debouncedAtom.dispose();
+    });
+
+    // Cleanup when derived atom is disposed. Also unregister the source
+    // hook so long-lived sources don't accumulate dispose callbacks.
     debouncedAtom.onDispose(() {
       debounceTimer?.cancel();
       removeListener(listener);
-    });
-
-    // Cleanup derived atom when source atom is disposed
-    onDispose(() {
-      debounceTimer?.cancel();
-      debouncedAtom.dispose();
+      removeSourceHook();
     });
 
     return debouncedAtom;
@@ -51,14 +53,16 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
 
     addListener(listener);
 
-    // Cleanup when derived atom is disposed
-    mappedAtom.onDispose(() {
-      removeListener(listener);
+    // Cleanup derived atom when source atom is disposed
+    final removeSourceHook = onDispose(() {
+      mappedAtom.dispose();
     });
 
-    // Cleanup derived atom when source atom is disposed
-    onDispose(() {
-      mappedAtom.dispose();
+    // Cleanup when derived atom is disposed. Also unregister the source
+    // hook so long-lived sources don't accumulate dispose callbacks.
+    mappedAtom.onDispose(() {
+      removeListener(listener);
+      removeSourceHook();
     });
 
     return mappedAtom;
@@ -124,7 +128,9 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
 
     void listener(AsyncValue<T> asyncValue) {
       if (asyncValue.hasValue) {
-        chainedAtom.execute(() => nextOperation(asyncValue.value));
+        // The error is captured in chainedAtom's state; don't also let it
+        // escape as an unhandled Future error.
+        chainedAtom.execute(() => nextOperation(asyncValue.value)).ignore();
       } else if (asyncValue.hasError) {
         chainedAtom.setError(asyncValue.error!, asyncValue.stackTrace!);
       } else if (asyncValue.isLoading) {
@@ -139,14 +145,16 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
     // Propagate initial state
     listener(value);
 
-    // Cleanup when derived atom is disposed
-    chainedAtom.onDispose(() {
-      removeListener(listener);
+    // Cleanup derived atom when source atom is disposed
+    final removeSourceHook = onDispose(() {
+      chainedAtom.dispose();
     });
 
-    // Cleanup derived atom when source atom is disposed
-    onDispose(() {
-      chainedAtom.dispose();
+    // Cleanup when derived atom is disposed. Also unregister the source
+    // hook so long-lived sources don't accumulate dispose callbacks.
+    chainedAtom.onDispose(() {
+      removeListener(listener);
+      removeSourceHook();
     });
 
     return chainedAtom;
@@ -182,16 +190,18 @@ extension AsyncAtomExtensions<T> on AsyncAtom<T> {
 
     addListener(listener);
 
-    // Cleanup when derived atom is disposed
+    // Cleanup derived atom when source atom is disposed
+    final removeSourceHook = onDispose(() {
+      ttlTimer?.cancel();
+      cachedAtom.dispose();
+    });
+
+    // Cleanup when derived atom is disposed. Also unregister the source
+    // hook so long-lived sources don't accumulate dispose callbacks.
     cachedAtom.onDispose(() {
       ttlTimer?.cancel();
       removeListener(listener);
-    });
-
-    // Cleanup derived atom when source atom is disposed
-    onDispose(() {
-      ttlTimer?.cancel();
-      cachedAtom.dispose();
+      removeSourceHook();
     });
 
     return cachedAtom;
@@ -216,24 +226,27 @@ extension AtomAsyncExtensions<T> on Atom<T> {
   AsyncAtom<R> asyncMap<R>(Future<R> Function(T value) operation) {
     final asyncAtom = AsyncAtom<R>(autoDispose: true);
 
-    // Execute initially
-    asyncAtom.execute(() => operation(value));
+    // Execute initially. Errors are captured in asyncAtom's state, so the
+    // returned future's error is ignored rather than left unhandled.
+    asyncAtom.execute(() => operation(value)).ignore();
 
     // Execute when atom changes
     void listener(T newValue) {
-      asyncAtom.execute(() => operation(newValue));
+      asyncAtom.execute(() => operation(newValue)).ignore();
     }
 
     addListener(listener);
 
-    // Cleanup when derived atom is disposed
-    asyncAtom.onDispose(() {
-      removeListener(listener);
+    // Cleanup derived atom when source atom is disposed
+    final removeSourceHook = onDispose(() {
+      asyncAtom.dispose();
     });
 
-    // Cleanup derived atom when source atom is disposed
-    onDispose(() {
-      asyncAtom.dispose();
+    // Cleanup when derived atom is disposed. Also unregister the source
+    // hook so long-lived sources don't accumulate dispose callbacks.
+    asyncAtom.onDispose(() {
+      removeListener(listener);
+      removeSourceHook();
     });
 
     return asyncAtom;
@@ -262,7 +275,8 @@ AsyncAtom<R> computedAsync<R>(
     debounceTimer?.cancel();
     debounceTimer = Timer(debounce, () {
       if (!asyncAtom.isDisposed) {
-        asyncAtom.execute(compute);
+        // Error is captured in state; avoid an unhandled Future error.
+        asyncAtom.execute(compute).ignore();
       }
     });
   }

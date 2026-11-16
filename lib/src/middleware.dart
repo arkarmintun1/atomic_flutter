@@ -1,4 +1,5 @@
 import 'package:atomic_flutter/src/core.dart';
+import 'package:flutter/foundation.dart';
 
 /// Base class for atom middleware.
 ///
@@ -53,8 +54,7 @@ class LoggingMiddleware extends AtomMiddleware {
   @override
   T onSet<T>(Atom<T> atom, T oldValue, T newValue) {
     assert(() {
-      // ignore: avoid_print
-      print('[AtomicFlutter] ${atom.id}: $oldValue → $newValue');
+      debugPrint('[AtomicFlutter] ${atom.id}: $oldValue → $newValue');
       return true;
     }());
     return newValue;

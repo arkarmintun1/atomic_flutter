@@ -24,10 +24,10 @@ import 'package:flutter/widgets.dart';
 /// [initState] or event handlers has no effect on subscriptions.
 mixin WatchAtom<T extends StatefulWidget> on State<T> {
   /// Currently active subscriptions: atom → unsubscribe callback.
-  final Map<Atom, VoidCallback> _subscriptions = {};
+  final Map<Atom, VoidCallback> _subscriptions = Map.identity();
 
   /// Atoms accessed during the most-recent (or in-progress) build.
-  final Set<Atom> _watching = {};
+  final Set<Atom> _watching = Set.identity();
 
   bool _reconcileScheduled = false;
   bool _buildInProgress = false;

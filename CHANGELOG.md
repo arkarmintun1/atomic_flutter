@@ -4,6 +4,29 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.2] - 2026-11-16
+
+### Fixed
+
+- **Listener removal with method tear-offs** — `removeListener(_onValueChanged)` silently did nothing because listeners were compared with `identical`, and each tear-off is a new object. `AtomBuilder`, `AtomSelector` and `AtomHistory` now actually unsubscribe, so their State is no longer leaked and auto-dispose fires as intended
+- **Unhandled async errors** — `asyncMap`, `chain`, `computedAsync` and the `AsyncAtomBuilder` Retry button / pull-to-refresh no longer let a failed operation escape as an uncaught error; the error is kept in the atom's state only. `persistAtom` now handles storage `read`/`write` failures instead of leaving them unhandled
+- **Atoms that share an id** — `AtomBuilder`, `AtomSelector`, `MultiAtomBuilder`, `WatchAtom` and `atomicUpdate()` now track atoms by identity, so two different atoms with the same `id` are no longer treated as one subscription (`Atom ==` is unchanged)
+- **`AtomSelector` stale selection** — re-runs the selector when the widget is rebuilt with a new selector (e.g. `(list) => list[index]` with a new `index`); a throwing selector keeps the last good value; no `setState` after unmount
+- **Dispose-callback leak on long-lived atoms** — `map`, `where`, `debounce`, `throttle`, `combine`, `asStream` and the async extensions now remove their cleanup hook from the source when the derived atom (or stream subscription) goes away first
+- **`asStream()`** — no longer throws `LateInitializationError` when the source is disposed before the stream is listened to
+- **`Atom.dispose()`** — iterates a snapshot of dispose callbacks so a callback can unregister others safely
+
+### Changed
+
+- **`atomicUpdate()`** asserts in debug builds when given an `async` callback (only the code before the first `await` was ever batched)
+- Diagnostic output uses `debugPrint` instead of `print`
+- Minimum Flutter version is now `3.27.0`, matching the existing Dart `^3.6.2` constraint
+
+### Added
+
+- `Atom.debugDisposeCallbackCount` (`@visibleForTesting`)
+- Regression tests for every fix above (`test/regression_v0_5_2_test.dart`)
+
 ## [0.5.1] - 2026-03-22
 
 ### Fixed
