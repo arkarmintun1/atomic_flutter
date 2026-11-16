@@ -202,15 +202,10 @@ class AsyncAtom<T> extends Atom<AsyncValue<T>> {
 
   AsyncAtom({
     AsyncValue<T>? initialValue,
-    String? id,
-    bool autoDispose = true,
-    Duration? disposeTimeout,
-  }) : super(
-          initialValue ?? const AsyncValue.idle(),
-          id: id,
-          autoDispose: autoDispose,
-          disposeTimeout: disposeTimeout,
-        );
+    super.id,
+    super.autoDispose = true,
+    super.disposeTimeout,
+  }) : super(initialValue ?? const AsyncValue.idle());
 
   /// Execute an async operation.
   ///
